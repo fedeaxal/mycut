@@ -19,9 +19,12 @@ name: Build
 #   triplet an input so the Intel Mac job can ask for x64-osx-dynamic), and
 #   the archive carries the runtime libraries beside the executable.
 # - Everything else — codecs, WebRTC, the ASR worker's sherpa-onnx — is pure
-#   Rust or statically linked, and onnxruntime is loaded dynamically and only
-#   for the face pipeline, which degrades gracefully without it. The archive
-#   is the executable and FFmpeg, nothing more.
+#   Rust or statically linked. The one other runtime library is onnxruntime,
+#   which the face pipeline (detection, landmarks, beauty filters) loads
+#   dynamically and finds beside the executable; each job downloads the
+#   official release of it into the archive, so those features work out of
+#   the box. The face models themselves are compiled into the executable
+#   (`mediapipe`'s `include_bytes!`), so the library is all it takes.
 
 on:
   push:
@@ -50,6 +53,21 @@ env:
 jobs:
   windows:
     runs-on: windows-2025
+    env:
+      # One C runtime across everything the executable links. The sherpa-onnx
+      # fork's prebuilt Windows static libraries are built with /MT (its
+      # release assets are `static-MT-Release`), while a Rust MSVC build
+      # defaults to /MD — and cc-compiled /MD objects beside them (rusqlite's
+      # bundled sqlite3, tracy-client, aws-lc-sys, ring) fail the link with
+      # LNK2038. `crt-static` moves the whole image to /MT instead: rustc
+      # links the static CRT, and cc-rs passes /MT to every C dependency it
+      # compiles, so all the native code in the image agrees.
+      #
+      # What it does not reach, by design: FFmpeg — its av*.lib are import
+      # libraries, the runtime inside each DLL is that DLL's own, and the
+      # archive still carries the redistributable for them — and onnxruntime,
+      # which the face pipeline loads at run time.
+      RUSTFLAGS: -C target-feature=+crt-static
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -106,6 +124,29 @@ jobs:
           FILMCRAFT_REQUIRE_WINRES: "1"
         run: cargo build --release --locked -p filmcraft
 
+      # The face pipeline's inference engine, which `ort` loads at run time
+      # (load-dynamic): the executable does not link it and looks for
+      # `onnxruntime.dll` beside itself — see apps/reaction's
+      # `src/face/detect.rs`. 1.28 is the version `ort` 2.0.0-rc.13 is
+      # developed against. The package Microsoft ships for it carries only
+      # the CPU execution provider compiled in, so a DirectML request falls
+      # back to CPU exactly as `facelandmark`'s provider list plans for.
+      #
+      # `tar` rather than Expand-Archive: it can leave the 400 MB .pdb out.
+      - name: Download ONNX Runtime
+        shell: pwsh
+        run: |
+          $version = "1.28.0"
+          $root = "onnxruntime-win-x64-$version"
+          curl.exe -fsSL "https://github.com/microsoft/onnxruntime/releases/download/v$version/$root.zip" -o "$env:RUNNER_TEMP\$root.zip"
+          if ($LASTEXITCODE -ne 0) { throw "onnxruntime download failed ($LASTEXITCODE)" }
+          New-Item -ItemType Directory -Force -Path .onnxruntime | Out-Null
+          tar -xf "$env:RUNNER_TEMP\$root.zip" -C .onnxruntime --exclude=*.pdb
+          if ($LASTEXITCODE -ne 0) { throw "onnxruntime extract failed ($LASTEXITCODE)" }
+          if (-not (Test-Path ".onnxruntime/$root/lib/onnxruntime.dll")) {
+            throw "no onnxruntime.dll in the package"
+          }
+
       # Everything in the FFmpeg tree's `bin`, not the few libraries the
       # executable names: avcodec pulls in openh264, zlib and whatever else
       # the port's dependencies installed, and those are loaded by name at run
@@ -133,6 +174,18 @@ jobs:
           Write-Host "runtime from $($crt.FullName)"
           Copy-Item "$($crt.FullName)/*.dll" $stage
 
+          # The inference engine, beside the executable where the face
+          # pipeline looks for it, and the licences of what the archive
+          # bundles: onnxruntime's own, and vcpkg's per-port copyright files,
+          # which name the terms of precisely the FFmpeg build being shipped
+          # rather than a list kept by hand.
+          Copy-Item .onnxruntime/*/lib/*.dll $stage
+          New-Item -ItemType Directory -Force -Path "$stage/licenses" | Out-Null
+          Copy-Item .onnxruntime/*/LICENSE "$stage/licenses/onnxruntime-LICENSE.txt"
+          Copy-Item .onnxruntime/*/ThirdPartyNotices.txt "$stage/licenses/onnxruntime-ThirdPartyNotices.txt"
+          Get-ChildItem "$env:FFMPEG_DIR/share" -Filter copyright -Recurse |
+            ForEach-Object { Copy-Item $_.FullName "$stage/licenses/$($_.Directory.Name).txt" }
+
           # For the steps below, which work on what this one made.
           "STAGE=$stage" >> $env:GITHUB_ENV
           Get-ChildItem $stage -Recurse -File | Select-Object FullName, Length
@@ -148,6 +201,9 @@ jobs:
           # And the one whose absence shows as a dialog box instead of the
           # application, on any Windows without the redistributable installed.
           if (-not (Test-Path "$stage/vcruntime140.dll")) { throw "no Visual C++ runtime in the archive" }
+          # Without it the face features degrade on every machine, silently.
+          if (-not (Test-Path "$stage/onnxruntime.dll")) { throw "no ONNX Runtime in the archive" }
+          if (-not (Get-ChildItem "$stage/licenses/*.txt")) { throw "no bundled licences in the archive" }
 
       - name: Pack
         shell: pwsh
@@ -162,10 +218,10 @@ jobs:
           path: dist/*.zip
           if-no-files-found: error
 
-  # Two macOS builds, one job: they differ in their runner and their vcpkg
-  # triplet and in nothing else. `macos-15-intel` is the last x86_64 image
-  # GitHub offers — when it goes, so does this matrix entry, and with it
-  # Intel macOS support.
+  # Two macOS builds, one job: they differ in their runner, their vcpkg
+  # triplet and their onnxruntime version, and in nothing else.
+  # `macos-15-intel` is the last x86_64 image GitHub offers — when it goes,
+  # so does this matrix entry, and with it Intel macOS support.
   macos:
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -175,9 +231,17 @@ jobs:
           - runner: macos-15
             triplet: arm64-osx-dynamic
             suffix: arm64-macos
+            ort-version: "1.28.0"
+            ort-arch: arm64
           - runner: macos-15-intel
             triplet: x64-osx-dynamic
             suffix: x86_64-macos
+            # 1.23 is the last release Microsoft shipped an osx-x86_64 binary
+            # for. It loads because `ort`, with no api-* feature enabled
+            # anywhere in the tree, requests C API version 17 — its feature
+            # ladder's floor — which every runtime from 1.17 on answers.
+            ort-version: "1.23.0"
+            ort-arch: x86_64
     env:
       # What makes the archive self-contained: vcpkg's dylibs are named
       # `@rpath/...`, and the executable searches its own directory before
@@ -220,6 +284,32 @@ jobs:
       - name: Build
         run: cargo build --release --locked -p filmcraft
 
+      # The face pipeline's inference engine, as on Windows: loaded at run
+      # time, looked for beside the executable (`libonnxruntime.dylib`), and
+      # its dependencies are every one system frameworks — CoreML included,
+      # which is what the arm64 EP list asks for — so the one dylib is all
+      # the archive needs of it. It arrives ad-hoc signed by Microsoft's
+      # linker and is copied untouched, which is what Apple silicon requires
+      # of it.
+      #
+      # The 1.28 dylib is built for macOS 14: on 13 the face features degrade
+      # the way a missing library degrades them, and nothing else notices.
+      - name: Download ONNX Runtime
+        run: |
+          set -euo pipefail
+          version="${{ matrix.ort-version }}"
+          root="onnxruntime-osx-${{ matrix.ort-arch }}-$version"
+          curl -fsSL "https://github.com/microsoft/onnxruntime/releases/download/v$version/$root.tgz" -o "$RUNNER_TEMP/$root.tgz"
+          mkdir -p .onnxruntime
+          # The whole package, then the one file that ships: 1.23's members
+          # are named `./onnxruntime-...` where 1.28's are not, and the
+          # extracted tree is the same either way.
+          tar -xzf "$RUNNER_TEMP/$root.tgz" -C .onnxruntime
+          cp ".onnxruntime/$root/lib/libonnxruntime.dylib" \
+             ".onnxruntime/$root/LICENSE" \
+             ".onnxruntime/$root/ThirdPartyNotices.txt" .onnxruntime/
+          ls -l .onnxruntime
+
       # The executable plus every dylib the FFmpeg tree installed, beside it:
       # vcpkg names them `@rpath/...`, they name each other the same way, and
       # the loader resolves all of that through the executable's own
@@ -232,6 +322,18 @@ jobs:
           mkdir -p "$stage"
           cp target/release/filmcraft "$stage"
           cp -R "$FFMPEG_DIR"/lib/*.dylib "$stage"
+          # The inference engine, beside the executable where the face
+          # pipeline looks for it, and the licences of what the archive
+          # bundles — onnxruntime's own and vcpkg's per-port FFmpeg
+          # copyright files, as on Windows.
+          cp .onnxruntime/libonnxruntime.dylib "$stage"
+          mkdir -p "$stage/licenses"
+          cp .onnxruntime/LICENSE "$stage/licenses/onnxruntime-LICENSE.txt"
+          cp .onnxruntime/ThirdPartyNotices.txt "$stage/licenses/onnxruntime-ThirdPartyNotices.txt"
+          find "$FFMPEG_DIR/share" -name copyright -print0 |
+            while IFS= read -r -d '' file; do
+              cp "$file" "$stage/licenses/$(basename "$(dirname "$file")").txt"
+            done
           # The linker already signed the executable it built; signing it
           # again says so over anything a later step did to it, and costs
           # nothing where it did not. Apple silicon runs nothing unsigned.
@@ -254,16 +356,27 @@ jobs:
           # Without FFmpeg beside it the executable does not reach `main`.
           compgen -G "$stage/libavcodec*.dylib" > /dev/null \
             || { echo "no FFmpeg libraries in the archive" >&2; exit 1; }
+          # Without it the face features degrade on every machine, silently.
+          [ -f "$stage/libonnxruntime.dylib" ] \
+            || { echo "no ONNX Runtime in the archive" >&2; exit 1; }
+          compgen -G "$stage/licenses/*.txt" > /dev/null \
+            || { echo "no bundled licences in the archive" >&2; exit 1; }
 
           # Every library anything in the archive asks for has to be
           # resolvable from inside it: system libraries are the machine's own,
           # `@rpath/...` names must sit beside the executable, and an absolute
           # path is a build-machine location (`.vcpkg/installed/...`) that no
           # user's Mac has — anything here would fail on theirs instead of in
-          # this log.
+          # this log. Only Mach-O files are asked: the licences are text. A
+          # file's own install name is not one of its dependencies (`otool -L`
+          # lists it first all the same), so it is dropped — onnxruntime's is
+          # `@rpath/libonnxruntime.<version>.dylib`, and the archive holds the
+          # one unversioned name the face pipeline looks for.
           refs=$(
             for file in "$stage"/*; do
-              otool -L "$file" | tail -n +2 | awk '{print $1}'
+              file -b "$file" | grep -q '^Mach-O' || continue
+              id=$(otool -D "$file" | tail -n +2 | head -n 1 | awk '{print $1}')
+              otool -L "$file" | tail -n +2 | awk '{print $1}' | grep -vxF "$id"
             done
           )
           while IFS= read -r ref; do
