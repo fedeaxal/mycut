@@ -1,0 +1,28 @@
+[package]
+name = "asr"
+version = "0.1.0"
+edition = "2021"
+
+# ASR：SenseVoice 离线识别（热词实时更新）+ silero VAD，
+# 替换 opencut 的 sherpa-onnx-node（消费方 main/asr-service.ts）。
+# 自 opencut 的 N-API 原生模块移植为纯 Rust 库。
+#
+# sherpa-onnx 用 Rust fork（上游无 update_hotwords_text /
+# get_sensevoicesmall_result，rev 锁定在 Cargo.lock）；默认 static
+# feature = 构建期下载并静态链接预编译 C 库，运行时零 dylib 依赖。
+#
+# 该 C 依赖构建期要从 GitHub 拉预编译库且要求 C 工具链，故放在
+# `sensevoice` feature 之后（非默认）：工作区默认构建不碰它；接入
+# 识别运行时的宿主按 `asr/sensevoice` 启用。
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sherpa-onnx = { git = "https://github.com/letdevme/hotword.git", optional = true }
+
+[features]
+default = []
+sensevoice = ["dep:sherpa-onnx"]

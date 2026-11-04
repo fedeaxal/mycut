@@ -1,0 +1,13 @@
+[package]
+name = "beauty-filters"
+version = "0.1.0"
+edition = "2024"
+description = "GPU-accelerated image filter library (beauty filters) using wgpu"
+
+[dependencies]
+# 版本与 reaction 的 wgpu 统一（workspace 内同一份 Cargo.lock）。
+wgpu = "30"
+bytemuck = { version = "1", features = ["derive"] }
+# image 在 workspace 内统一 0.25；这里只解码内嵌的 PNG 贴图。
+image = { version = "0.25", default-features = false, features = ["png"] }
+pollster = "1"

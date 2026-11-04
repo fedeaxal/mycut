@@ -1,0 +1,32 @@
+[package]
+name = "ai-gateway"
+version = "0.1.0"
+edition = "2021"
+
+# AI 网关：OpenAI 兼容 /chat/completions 的传输（ureq）+ 全部 prompt
+# 模板与请求组装 + 同音词 FST 生成 + 按需下载器 + 应用状态 KV。
+# 模板字节级对齐被替换的渲染端 JS 实现（KV 前缀缓存按 token 前缀命中
+# 依赖逐字节一致，parity 脚本锁定）。
+# 自 opencut 的 N-API 原生模块移植为纯 Rust 库：JSON 信封/事件契约原样
+# 保留（`dispatch`/`run_download`），宿主（filmcraft 的 Reaction 页）在
+# 自己的线程上调用并消费事件。
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+# 阻塞 HTTP 客户端：所有 AI 请求均为 stream:false 的单发 JSON POST，
+# 每请求独占线程，无需异步运行时。与工作区其余部分同为 ureq 3；无默认
+# 特性 = 无内置 TLS，显式配置 rustls + aws-lc-rs 提供者——字体批量下载
+# 要过上百 MB 的 TLS 流，aws-lc-rs 走硬件 AES，纯软件实现会吃满一个核
+# （rustls 版本与 filmcraft-speech 一致，aws-lc-rs 已在依赖树中）
+ureq = { version = "3", default-features = false, features = ["rustls-no-provider", "platform-verifier", "json"] }
+rustls = { version = "0.23", default-features = false, features = ["std", "aws_lc_rs"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+# 登录标记防篡改：HMAC-SHA256 完整性 + 内容混淆（auth.rs）
+sha2 = "0.10"
+hmac = "0.12"
+# ASR 识别模型下载（modelscope 官方库，带 Range 断点续传）：库 API 是
+# async（reqwest/tokio），在下载线程内自建 runtime block_on 执行
+modelscope = "0.1.5"
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread"] }

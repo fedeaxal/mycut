@@ -1,0 +1,8 @@
+*.png
+*.onnx
+target
+onnxruntime-osx-x86_64-1.24.2
+# src/res/*.png 被 include_bytes! 编译期嵌入（beauty_face_unit_filter.rs /
+# blusher_filter.rs / lipstick_filter.rs），必须随仓库提交——否定恢复。
+!src/res/
+!src/res/*.png

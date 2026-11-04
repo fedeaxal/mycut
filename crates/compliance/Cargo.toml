@@ -1,0 +1,18 @@
+[package]
+name = "compliance"
+version = "0.1.0"
+edition = "2021"
+
+# 录制中违规审核（Layer1 违禁词 + Layer2 六类风险信号）的本地扫描器。
+# 词库与规则编进二进制（防逆向第一优先项）。
+# 自 opencut 的 N-API 原生模块移植为纯 Rust 库，宿主（filmcraft 的
+# Reaction 页）对每句 ASR 定稿文本调用 scan_text。
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+# 仅一处 lookahead（100%(?=有效|…)）；regex crate 不支持环视，用
+# fancy-regex 保持与 JS RegExp 语义 1:1
+fancy-regex = "0.14"

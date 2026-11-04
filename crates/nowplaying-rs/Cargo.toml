@@ -1,0 +1,19 @@
+[package]
+name = "nowplaying-rs"
+version = "1.0.0"
+edition = "2021"
+description = "跨平台获取系统正在播放的媒体名称与播放进度（macOS / Windows），库 + CLI 验证工具"
+license = "BSD-3-Clause"
+
+[lib]
+name = "nowplaying"
+path = "src/lib.rs"
+
+[[bin]]
+name = "nowplaying"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1"
+ctrlc = "3"
+

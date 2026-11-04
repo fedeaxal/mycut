@@ -1,0 +1,9 @@
+pub const DEFAULT_VERTEX_WGSL: &str = include_str!("default_vertex.wgsl");
+pub const PASSTHROUGH_WGSL: &str = include_str!("passthrough.wgsl");
+pub const BRIGHTNESS_WGSL: &str = include_str!("brightness.wgsl");
+pub const BOX_BLUR_H_WGSL: &str = include_str!("box_blur_h.wgsl");
+pub const BOX_BLUR_V_WGSL: &str = include_str!("box_blur_v.wgsl");
+pub const BOX_DIFFERENCE_WGSL: &str = include_str!("box_difference.wgsl");
+pub const BEAUTY_FACE_UNIT_WGSL: &str = include_str!("beauty_face_unit.wgsl");
+pub const FACE_RESHAPE_WGSL: &str = include_str!("face_reshape.wgsl");
+pub const FACE_MAKEUP_WGSL: &str = include_str!("face_makeup.wgsl");

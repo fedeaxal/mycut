@@ -1,0 +1,10 @@
+[alias]
+xtask = "run --quiet --package xtask --"
+
+# `cargo run` on macOS runs FilmCraft through the development application
+# bundle, which is the only place its browser engine can be loaded from (the
+# Reaction page's Browser Source — see packaging/macos/run-app.sh). Everything
+# else cargo runs — a test binary, an example, filmcraft-cli — the script
+# passes through untouched.
+[target.'cfg(target_os = "macos")']
+runner = "packaging/macos/run-app.sh"

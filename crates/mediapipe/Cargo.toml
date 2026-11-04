@@ -1,0 +1,55 @@
+[package]
+name = "facelandmark"
+version = "0.2.0"
+edition = "2024"
+description = "MediaPipe 人脸检测/关键点/表情系数/人像分割推理库（ONNX Runtime）及命令行工具"
+license = "MIT"
+
+[lib]
+name = "facelandmark"
+path = "src/lib.rs"
+
+[[bin]]
+name = "facelandmark-cli"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.98"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+fast_image_resize = "5.1.4"
+ndarray = { version = "0.17", features = ["rayon"] }
+rayon = "1.10.0"
+# 仅在通过 `--tracy` 启动采集时才有开销，平时为空操作，保留原工程的性能分析能力
+tracy-client = "0.18.0"
+
+# ONNX Runtime 按目标平台开执行提供者（load-dynamic：运行时加载 onnxruntime
+# 动态库，模型与 EP 在 utils::Ep 里再按平台选择；版本与 media 的 ort 统一，
+# workspace 内只编译一份）。ndarray feature 供输入张量走 ndarray 视图（ort 侧
+# 也是 0.17，与本项目统一）；关掉 default 的 download-binaries/copy-dylibs——
+# load-dynamic 下不需要构建期拉二进制。
+# - macOS Apple Silicon：CoreML
+# - Windows：DirectML
+# - 其余（Intel macOS / Linux）：纯 CPU——Intel 核显上 CoreML 实测反而更慢，
+#   Windows 的 DirectML 已单列。
+[target.'cfg(all(target_os = "macos", target_arch = "aarch64"))'.dependencies]
+ort = { version = "2.0.0-rc.13", default-features = false, features = [
+    "std",
+    "ndarray",
+    "load-dynamic",
+    "coreml",
+] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+ort = { version = "2.0.0-rc.13", default-features = false, features = [
+    "std",
+    "ndarray",
+    "load-dynamic",
+    "directml",
+] }
+
+[target.'cfg(not(any(all(target_os = "macos", target_arch = "aarch64"), target_os = "windows")))'.dependencies]
+ort = { version = "2.0.0-rc.13", default-features = false, features = [
+    "std",
+    "ndarray",
+    "load-dynamic",
+] }

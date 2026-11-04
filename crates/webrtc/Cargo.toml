@@ -1,0 +1,30 @@
+[package]
+name = "webrtc"
+version = "0.3.0"
+edition = "2024"
+description = "The phone camera: a self-signed HTTPS server that serves the phone page and speaks its WebRTC signalling, hands the decoded picture and sound to the studio."
+license.workspace = true
+
+[dependencies]
+# The studio's own clean-room codecs — H.264 (ITU-T Rec. H.264) and Opus
+# (RFC 6716) decoded in Rust. One codec stack for the whole program: the
+# editor ships these already, and a phone's 720p stream is a light load
+# even in software.
+filmcraft-h264.workspace = true
+filmcraft-opus.workspace = true
+log.workspace = true
+# The self-signed certificate the phone's browser warns about once.
+rcgen = "0.13"
+# TLS for the same port the page and the signalling share.
+# The crypto provider, pinned here because both candidates (ring and
+# aws-lc-rs) sit in the tree and rustls refuses to pick between them.
+rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }
+# WebRTC: the phone is the offerer, this side answers.
+bytes = "1"
+# sans-I/O WebRTC（无 tokio）：事件循环由本 crate 的会话线程驱动。
+rtc = "0.20.3"
+socket2 = "0.6"
+serde_json = "1"
+
+[dev-dependencies]
+env_logger = "0.11"

@@ -1,0 +1,944 @@
+<!doctype html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+        />
+        <title>手机摄像头</title>
+        <style>
+            :root {
+                color-scheme: dark;
+                --accent: #ff4d4f;
+                --accent-soft: #ff4d4f22;
+                --bg: #0e0f12;
+                --card: #17181d;
+                --line: #2a2d35;
+                --text: #e8eaed;
+                --dim: #8b909a;
+            }
+            * {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+                -webkit-tap-highlight-color: transparent;
+            }
+            html,
+            body {
+                height: 100%;
+                overflow: hidden;
+                overscroll-behavior: none;
+            }
+            body {
+                font-family:
+                    -apple-system, "PingFang SC", "Microsoft YaHei", system-ui,
+                    sans-serif;
+                background: radial-gradient(
+                    120% 90% at 50% 0%,
+                    #1a1c22 0%,
+                    var(--bg) 60%
+                );
+                color: var(--text);
+                height: 100dvh;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: max(10px, env(safe-area-inset-top)) 16px
+                    max(10px, env(safe-area-inset-bottom));
+                gap: 10px;
+                user-select: none;
+                -webkit-user-select: none;
+            }
+            h1 {
+                font-size: clamp(14px, 4vw, 17px);
+                font-weight: 600;
+                letter-spacing: 0.02em;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex: none;
+            }
+            h1 .dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: #555;
+                transition: 0.3s;
+                flex: none;
+            }
+            h1 .dot.on {
+                background: var(--accent);
+                box-shadow: 0 0 10px #ff4d4faa;
+            }
+
+            .video-wrap {
+                flex: 1 1 0;
+                min-height: 0;
+                width: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .video-box {
+                background: #08090b;
+                border-radius: 16px;
+                overflow: hidden;
+                position: relative;
+                border: 1px solid var(--line);
+                box-shadow:
+                    0 8px 32px #00000088,
+                    0 0 0 1px #ffffff08 inset;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .video-box.live {
+                border-color: #ff4d4f55;
+            }
+            video {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                transform: scaleX(-1);
+                display: block;
+            }
+            video.off {
+                display: none;
+            }
+            .placeholder {
+                color: #5a6068;
+                font-size: 13px;
+                text-align: center;
+                padding: 0 16px;
+                line-height: 1.7;
+            }
+            .placeholder.off {
+                display: none;
+            }
+
+            #status {
+                font-size: 12.5px;
+                color: #b6bbc4;
+                background: var(--card);
+                border: 1px solid var(--line);
+                padding: 7px 14px;
+                border-radius: 999px;
+                font-variant-numeric: tabular-nums;
+                text-align: center;
+                max-width: 92vw;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                flex: none;
+            }
+
+            /* 麦克风音量表 */
+            .meter-row {
+                width: 100%;
+                max-width: 460px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                flex: none;
+            }
+            .meter-row .label {
+                font-size: 12px;
+                color: var(--dim);
+                flex: none;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
+            .meter {
+                flex: 1;
+                height: 10px;
+                border-radius: 999px;
+                background: #1c1e24;
+                border: 1px solid var(--line);
+                overflow: hidden;
+                position: relative;
+            }
+            .meter .fill {
+                position: absolute;
+                inset: 0;
+                transform-origin: left center;
+                transform: scaleX(0);
+                background: linear-gradient(
+                    90deg,
+                    #34d399 0%,
+                    #fbbf24 62%,
+                    #ff4d4f 92%
+                );
+                border-radius: 999px;
+                transition: transform 0.1s linear;
+            }
+            .meter .ticks {
+                position: absolute;
+                inset: 0;
+                background: repeating-linear-gradient(
+                    90deg,
+                    transparent 0 calc(10% - 1px),
+                    #0e0f12 calc(10% - 1px) 10%
+                );
+                border-radius: 999px;
+                pointer-events: none;
+            }
+
+            .btns {
+                display: flex;
+                gap: 8px;
+                flex-wrap: nowrap;
+                justify-content: center;
+                width: 100%;
+                max-width: 460px;
+                flex: none;
+            }
+            .btns > * {
+                flex: 1;
+                min-width: 0;
+            }
+            .res-group {
+                display: flex;
+                gap: 0;
+                background: var(--card);
+                border: 1px solid var(--line);
+                border-radius: 12px;
+                padding: 3px;
+                flex: none;
+            }
+            .res-group button {
+                appearance: none;
+                border: 0;
+                background: transparent;
+                color: var(--dim);
+                font-size: 12.5px;
+                padding: 7px 14px;
+                border-radius: 9px;
+                font-weight: 500;
+            }
+            .res-group button.active {
+                background: var(--accent-soft);
+                color: var(--accent);
+                font-weight: 600;
+            }
+            .mic-row {
+                width: 100%;
+                max-width: 460px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                flex: none;
+            }
+            .mic-row .label {
+                font-size: 12px;
+                color: var(--dim);
+                flex: none;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
+            #micSelect {
+                flex: 1;
+                min-width: 0;
+                appearance: none;
+                -webkit-appearance: none;
+                background: var(--card)
+                    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238b909a' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")
+                    no-repeat right 10px center;
+                border: 1px solid var(--line);
+                color: var(--text);
+                font-size: 12.5px;
+                padding: 7px 26px 7px 10px;
+                border-radius: 999px;
+                outline: none;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            button.act {
+                appearance: none;
+                border: 1px solid var(--line);
+                background: #20232a;
+                color: var(--text);
+                font-size: 14.5px;
+                padding: 11px 8px;
+                border-radius: 12px;
+                font-weight: 500;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+                cursor: pointer;
+                transition:
+                    transform 0.08s,
+                    background 0.2s;
+            }
+            button.act:active {
+                transform: scale(0.96);
+            }
+            button.act.primary {
+                background: linear-gradient(180deg, #ff5c5e, #e93f42);
+                border-color: #ff6b6d;
+                color: #fff;
+                font-weight: 600;
+                box-shadow: 0 4px 14px #ff4d4f44;
+            }
+            button.act.stop {
+                background: #2a1416;
+                border-color: #5c2a2d;
+                color: #ff8082;
+            }
+            button:disabled {
+                opacity: 0.35;
+            }
+            .tip {
+                font-size: 11.5px;
+                color: #61666f;
+                max-width: 440px;
+                text-align: center;
+                line-height: 1.55;
+                flex: none;
+            }
+        </style>
+    </head>
+    <body>
+        <h1><span class="dot" id="dot"></span>手机摄像头 → 电脑</h1>
+        <div class="video-wrap" id="videoWrap">
+            <div class="video-box" id="videoBox">
+                <video
+                    id="preview"
+                    class="off"
+                    autoplay
+                    playsinline
+                    muted
+                ></video>
+                <div class="placeholder" id="placeholder">
+                    点击下方「开始推流」<br />画面将实时传到电脑
+                </div>
+            </div>
+        </div>
+        <div id="status">未连接</div>
+        <div class="res-group" id="resGroup">
+            <button data-res="360p" class="active">流畅</button>
+            <button data-res="480p">标准</button>
+            <button data-res="720p">高清</button>
+        </div>
+        <div class="mic-row">
+            <span class="label">
+                <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                >
+                    <rect x="9" y="2" width="6" height="12" rx="3" />
+                    <path d="M5 10a7 7 0 0 0 14 0M12 17v5" />
+                </svg>
+                麦克风
+            </span>
+            <select id="micSelect">
+                <option value="">默认麦克风</option>
+            </select>
+        </div>
+        <div class="meter-row">
+            <span class="label">音量</span>
+            <div class="meter">
+                <div class="fill" id="meterFill"></div>
+                <div class="ticks"></div>
+            </div>
+        </div>
+        <div class="btns">
+            <button id="startBtn" class="act primary">▶ 开始推流</button>
+            <button id="flipBtn" class="act" disabled>⟳ 翻转</button>
+            <button id="stopBtn" class="act stop" disabled>■ 停止</button>
+        </div>
+        <p class="tip">
+            请确保手机与电脑连接同一
+            Wi-Fi。推流期间请保持此页面在前台，屏幕锁定会中断画面。
+        </p>
+
+        <script>
+            (() => {
+                const $ = (id) => document.getElementById(id);
+                const preview = $("preview"),
+                    placeholder = $("placeholder"),
+                    status = $("status"),
+                    dot = $("dot");
+                const videoBox = $("videoBox"),
+                    videoWrap = $("videoWrap"),
+                    meterFill = $("meterFill");
+                const startBtn = $("startBtn"),
+                    flipBtn = $("flipBtn"),
+                    stopBtn = $("stopBtn");
+                const micSelect = $("micSelect");
+
+                                    pc = null,
+                    stream = null,
+                    facing = "user",
+                    running = false;
+                let currentMicId = "";
+                // 分辨率默认 360p；切换用 applyConstraints 原地生效，不断流不重连
+                let currentRes = "360p";
+                const RESOLUTIONS = {
+                    "360p": { w: 640, h: 360, bitrate: 700000 },
+                    "480p": { w: 854, h: 480, bitrate: 1200000 },
+                    "720p": { w: 1280, h: 720, bitrate: 2500000 },
+                };
+
+                const setStatus = (t) => (status.textContent = t);
+
+                // ---- 麦克风设备列表与切换 ----
+                async function refreshMics() {
+                    if (
+                        !navigator.mediaDevices ||
+                        !navigator.mediaDevices.enumerateDevices
+                    )
+                        return;
+                    try {
+                        const mics = (
+                            await navigator.mediaDevices.enumerateDevices()
+                        ).filter((d) => d.kind === "audioinput");
+                        micSelect.innerHTML = "";
+                        mics.forEach((d, i) => {
+                            const o = document.createElement("option");
+                            o.value = d.deviceId;
+                            o.textContent = d.label || "麦克风 " + (i + 1);
+                            micSelect.appendChild(o);
+                        });
+                        if (
+                            currentMicId &&
+                            [...micSelect.options].some(
+                                (o) => o.value === currentMicId,
+                            )
+                        )
+                            micSelect.value = currentMicId;
+                    } catch (e) {
+                        console.warn("enumerateDevices failed", e);
+                    }
+                }
+                if (
+                    navigator.mediaDevices &&
+                    navigator.mediaDevices.addEventListener
+                ) {
+                    navigator.mediaDevices.addEventListener(
+                        "devicechange",
+                        () => {
+                            void refreshMics();
+                        },
+                    );
+                }
+                refreshMics();
+
+                async function switchMic(deviceId) {
+                    if (deviceId === currentMicId) return;
+                    if (!stream) {
+                        currentMicId = deviceId;
+                        return;
+                    }
+                    const old = stream.getAudioTracks()[0];
+                    try {
+                        setStatus("正在切换麦克风…");
+                        const s = await navigator.mediaDevices.getUserMedia({
+                            audio: {
+                                deviceId: { exact: deviceId },
+                                echoCancellation: true,
+                                noiseSuppression: true,
+                            },
+                        });
+                        const nt = s.getAudioTracks()[0];
+                        if (pc) {
+                            const sender = pc
+                                .getSenders()
+                                .find(
+                                    (x) => x.track && x.track.kind === "audio",
+                                );
+                            if (sender) await sender.replaceTrack(nt);
+                        }
+                        if (old) {
+                            stream.removeTrack(old);
+                            old.stop();
+                        }
+                        stream.addTrack(nt);
+                        currentMicId = deviceId;
+                        startMeter(); // 重建电平表分析节点，跟随新音轨
+                        setStatus("● 已切换麦克风");
+                    } catch (e) {
+                        micSelect.value = currentMicId;
+                        setStatus(
+                            "切换麦克风失败：" +
+                                (e && e.message ? e.message : e),
+                        );
+                    }
+                }
+                micSelect.addEventListener("change", () => {
+                    void switchMic(micSelect.value);
+                });
+
+                function videoConstraints() {
+                    const r = RESOLUTIONS[currentRes];
+                    // 始终按传感器原生横向全幅请求，浏览器只做缩放不裁切，保住完整视角；
+                    // frameRate 锁死 30 上限： prevents 60fps 采集，编码与发热直接减半
+                    return {
+                        facingMode: facing,
+                        width: { ideal: Math.max(r.w, r.h) },
+                        height: { ideal: Math.min(r.w, r.h) },
+                        frameRate: { ideal: 30, max: 30 },
+                    };
+                }
+
+                // 采集后对视频轨做编码层优化：motion 提示 + 码率上限 + 保持帧率优先
+                function optimizeVideoTrack(track) {
+                    // 告诉编码器内容以运动为主，优先保流畅而非细节（省码率、省编码功耗）
+                    try {
+                        track.contentHint = "motion";
+                    } catch {}
+                    applyBitrateCap(track);
+                }
+
+                function applyBitrateCap(track) {
+                    const r = RESOLUTIONS[currentRes];
+                    try {
+                        const sender =
+                            pc &&
+                            pc.getSenders().find((x) => x.track === track);
+                        if (!sender) return;
+                        const p = sender.getParameters();
+                        if (!p.encodings || !p.encodings.length)
+                            p.encodings = [{}];
+                        p.encodings[0].maxBitrate = r.bitrate;
+                        p.encodings[0].maxFramerate = 30;
+                        // 带宽吃紧时优先降分辨率保帧率，观感更顺滑
+                        p.degradationPreference = "maintain-framerate";
+                        sender.setParameters(p);
+                    } catch (e) {
+                        console.warn("setParameters failed", e);
+                    }
+                }
+
+                // 让预览框按实际画面比例铺满可用区域（JS 定尺寸，保证任何屏幕都不溢出）
+                function layoutVideoBox() {
+                    const availW = videoWrap.clientWidth,
+                        availH = videoWrap.clientHeight;
+                    // 有实际帧时跟随真实画面比例，避免框与画面方向不一致；无帧时默认竖屏 9:16
+                    let ar =
+                        running && preview.videoWidth > 0
+                            ? preview.videoWidth / preview.videoHeight
+                            : 9 / 16;
+                    ar = Math.max(0.4, Math.min(2.4, ar));
+                    let w = availH * ar,
+                        h = availH;
+                    if (w > availW) {
+                        w = availW;
+                        h = w / ar;
+                    }
+                    videoBox.style.width = Math.floor(w) + "px";
+                    videoBox.style.height = Math.floor(h) + "px";
+                }
+                window.addEventListener("resize", layoutVideoBox, {
+                    passive: true,
+                });
+                // 视频实际尺寸变化（含旋转）时重新适配预览框
+                preview.addEventListener("resize", layoutVideoBox);
+                layoutVideoBox();
+
+                // ---- 麦克风音量表（AnalyserNode，20Hz 采样足够，比 rAF 省电发热小）----
+                let audioCtx = null,
+                    analyser = null,
+                    meterBuf = null,
+                    meterTimer = 0,
+                    meterLevel = 0;
+                function startMeter() {
+                    stopMeter();
+                    try {
+                        audioCtx = new (
+                            window.AudioContext || window.webkitAudioContext
+                        )();
+                        const src = audioCtx.createMediaStreamSource(stream);
+                        analyser = audioCtx.createAnalyser();
+                        analyser.fftSize = 256;
+                        src.connect(analyser);
+                        meterBuf = new Float32Array(analyser.fftSize);
+                        if (audioCtx.state === "suspended") audioCtx.resume();
+                    } catch (e) {
+                        console.warn("meter init failed", e);
+                        return;
+                    }
+                    meterTimer = setInterval(() => {
+                        analyser.getFloatTimeDomainData(meterBuf);
+                        let sum = 0;
+                        for (let i = 0; i < meterBuf.length; i++)
+                            sum += meterBuf[i] * meterBuf[i];
+                        const rms = Math.sqrt(sum / meterBuf.length);
+                        const target = Math.min(1, rms * 5);
+                        // 平滑上升快、回落慢，视觉更像电平表；视觉补间交给 CSS transition
+                        meterLevel =
+                            target > meterLevel
+                                ? target
+                                : meterLevel + (target - meterLevel) * 0.35;
+                        meterFill.style.transform =
+                            "scaleX(" + meterLevel.toFixed(3) + ")";
+                    }, 50);
+                }
+                function stopMeter() {
+                    if (meterTimer) clearInterval(meterTimer);
+                    meterTimer = 0;
+                    analyser = null;
+                    if (audioCtx) {
+                        try {
+                            audioCtx.close();
+                        } catch {}
+                        audioCtx = null;
+                    }
+                    meterLevel = 0;
+                    meterFill.style.transform = "scaleX(0)";
+                }
+
+                async function switchResolution(next) {
+                    if (next === currentRes) return;
+                    const previous = currentRes;
+                    currentRes = next;
+                    markActiveRes();
+                    if (stream) {
+                        const track = stream.getVideoTracks()[0];
+                        if (!track) return;
+                        try {
+                            await track.applyConstraints(videoConstraints());
+                            applyBitrateCap(track);
+                            setStatus(
+                                "● 分辨率已切换",
+                                // +
+                                //     next +
+                                //     "（" +
+                                //     track.getSettings().width +
+                                //     "×" +
+                                //     track.getSettings().height +
+                                //     "）",
+                            );
+                        } catch (e) {
+                            currentRes = previous;
+                            markActiveRes();
+                            setStatus("切换失败：当前设备不支持 " + next);
+                        }
+                    }
+                }
+
+                function markActiveRes() {
+                    document
+                        .querySelectorAll("#resGroup button[data-res]")
+                        .forEach((b) => {
+                            b.classList.toggle(
+                                "active",
+                                b.dataset.res === currentRes,
+                            );
+                        });
+                }
+
+                // ---- 信令:服务端的两步 HTTP 协议 ----
+                //
+                // offer 先在本地把 ICE 候选收集完(非 trickle),按各自归属
+                // 的媒体段拼回 SDP,一次 POST /offer 交给服务端;然后轮询
+                // /status 到 answer-ready,再 GET /answer 取回应答。整条链路
+                // 只有三个请求,没有长连接,断网重试就是重新点一次开始。
+
+                async function waitForGathering(pc) {
+                    if (pc.iceGatheringState === "complete") return;
+                    await new Promise((resolve) => {
+                        const timer = setTimeout(done, 2500);
+                        function check() {
+                            if (pc.iceGatheringState === "complete") done();
+                        }
+                        function done() {
+                            clearTimeout(timer);
+                            pc.removeEventListener(
+                                "icegatheringstatechange",
+                                check,
+                            );
+                            resolve();
+                        }
+                        pc.addEventListener("icegatheringstatechange", check);
+                    });
+                }
+
+                // 候选必须插进各自归属的媒体段(m= 行之后):追加到 SDP
+                // 末尾只会让最后一段(音频)拿到候选,视频段一个候选都没
+                // 有,ICE 就永远配不对。
+                function embedCandidates(sdp, candidates) {
+                    const bySection = new Map();
+                    for (const c of candidates) {
+                        const index = c.sdpMLineIndex ?? 0;
+                        if (!bySection.has(index)) bySection.set(index, []);
+                        bySection.get(index).push("a=" + c.candidate);
+                    }
+                    if (!bySection.size) return sdp;
+                    const lines = sdp.split("\r\n");
+                    const out = [];
+                    let section = -1;
+                    for (const line of lines) {
+                        if (line.startsWith("m=")) {
+                            for (const candidate of bySection.get(section) ?? [])
+                                out.push(candidate);
+                            section += 1;
+                        }
+                        out.push(line);
+                    }
+                    for (const candidate of bySection.get(section) ?? [])
+                        out.push(candidate);
+                    return out.join("\r\n") + "\r\n";
+                }
+
+                async function pollAnswer() {
+                    // 20 秒还没应答,多半是服务端那边没起来:给一句能读的
+                    // 失败,而不是永远转圈。
+                    const deadline = Date.now() + 20000;
+                    while (Date.now() < deadline) {
+                        await new Promise((r) => setTimeout(r, 200));
+                        let state;
+                        try {
+                            const res = await fetch("/status");
+                            state = await res.json();
+                        } catch {
+                            continue;
+                        }
+                        if (state.state === "failed")
+                            throw new Error(state.error || "服务端协商失败");
+                        if (
+                            state.state === "answer-ready" ||
+                            state.state === "connected"
+                        ) {
+                            const res = await fetch("/answer");
+                            if (res.ok) return await res.json();
+                        }
+                    }
+                    throw new Error("等待服务端应答超时");
+                }
+
+                async function getStream() {
+                    return navigator.mediaDevices.getUserMedia({
+                        audio: currentMicId
+                            ? {
+                                  deviceId: { exact: currentMicId },
+                                  echoCancellation: true,
+                                  noiseSuppression: true,
+                              }
+                            : {
+                                  echoCancellation: true,
+                                  noiseSuppression: true,
+                              },
+                        video: videoConstraints(),
+                    });
+                }
+
+                // ---- Wake Lock：推流期间防止息屏（息屏会直接断流），回到前台自动补取 ----
+                let wakeLock = null;
+                async function requestWakeLock() {
+                    if (!navigator.wakeLock) return;
+                    try {
+                        wakeLock = await navigator.wakeLock.request("screen");
+                    } catch {}
+                }
+                function releaseWakeLock() {
+                    if (wakeLock) {
+                        try {
+                            wakeLock.release();
+                        } catch {}
+                        wakeLock = null;
+                    }
+                }
+                document.addEventListener("visibilitychange", () => {
+                    if (document.visibilityState === "visible" && running)
+                        void requestWakeLock();
+                });
+                // 页面真正关闭（导航/关标签页）时知会桌面端：sendBeacon 是
+                // 卸载期唯一可靠的请求。后台化不触发（beforeunload 不在
+                // 切后台时发生），不影响推流中切出去的场景；iOS 划掉标签
+                // 页杀进程收不到它，由桌面端的媒体静默看门狗兜底。
+                window.addEventListener("beforeunload", () => {
+                    if (running || pc) {
+                        try {
+                            navigator.sendBeacon("/stop");
+                        } catch {}
+                    }
+                });
+
+                async function start() {
+                    startBtn.disabled = true;
+                    try {
+                        setStatus("正在获取摄像头权限…");
+                        stream = await getStream();
+                        // 授权后设备 label 才可见，回填当前使用的麦克风并刷新列表
+                        const at = stream.getAudioTracks()[0];
+                        if (at && at.getSettings().deviceId)
+                            currentMicId = at.getSettings().deviceId;
+                        void refreshMics();
+                        const vt = stream.getVideoTracks()[0];
+                        if (vt) optimizeVideoTrack(vt);
+                        preview.srcObject = stream;
+                        preview.classList.remove("off");
+                        placeholder.classList.add("off");
+                        videoBox.classList.add("live");
+                        startMeter();
+                        setStatus("正在连接服务器…");
+                        await negotiate();
+                        running = true;
+                        flipBtn.disabled = false;
+                        stopBtn.disabled = false;
+                        dot.classList.add("on");
+                        void requestWakeLock();
+                    } catch (e) {
+                        setStatus("失败：" + (e && e.message ? e.message : e));
+                        teardown(false);
+                    }
+                    startBtn.disabled = running;
+                }
+
+                async function negotiate() {
+                    const candidates = [];
+                    pc = new RTCPeerConnection({ iceServers: [] });
+                    stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+                    pc.onicecandidate = (e) => {
+                        if (e.candidate) candidates.push(e.candidate);
+                    };
+                    pc.onconnectionstatechange = () => {
+                        const s = pc.connectionState;
+                        if (s === "connected")
+                            setStatus("● 推流中 — 已连接到电脑");
+                        else if (s === "connecting") setStatus("正在建立连接…");
+                        else if (s === "failed")
+                            setStatus("连接失败，请停止后重试");
+                        else if (s === "disconnected") setStatus("连接中断");
+                    };
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                    // 协商完成后套上码率/帧率上限(sender 存在才能 setParameters)
+                    stream.getVideoTracks().forEach((t) => applyBitrateCap(t));
+                    await waitForGathering(pc);
+                    const response = await fetch("/offer", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            type: "offer",
+                            sdp: embedCandidates(
+                                pc.localDescription.sdp,
+                                candidates,
+                            ),
+                        }),
+                    });
+                    if (!response.ok)
+                        throw new Error(
+                            "服务器拒绝了连接 (" + response.status + ")",
+                        );
+                    const answer = await pollAnswer();
+                    await pc.setRemoteDescription({
+                        type: "answer",
+                        sdp: answer.sdp,
+                    });
+                }
+
+                function teardown(resetStatus) {
+                    // 桌面端只知道两条路：ICE 静默（要等它的超时）和
+                    // POST /stop（立刻）。本页面停止/关页不走 /stop 的话，
+                    // 电脑那边要等 ~30 秒才把会话放掉、二维码才回来。
+                    const wasLive = running || pc !== null;
+                    running = false;
+                    if (pc) {
+                        pc.close();
+                        pc = null;
+                    }
+                    if (stream) {
+                        stream.getTracks().forEach((t) => t.stop());
+                        stream = null;
+                    }
+                    if (wasLive) {
+                        try {
+                            fetch("/stop", { method: "POST" }).catch(() => {});
+                        } catch {}
+                    }
+                    stopMeter();
+                    releaseWakeLock();
+                    preview.srcObject = null;
+                    preview.classList.add("off");
+                    placeholder.classList.remove("off");
+                    videoBox.classList.remove("live");
+                    dot.classList.remove("on");
+                    flipBtn.disabled = true;
+                    stopBtn.disabled = true;
+                    startBtn.disabled = false;
+                    if (resetStatus) setStatus("未连接");
+                }
+
+                async function flip() {
+                    facing = facing === "user" ? "environment" : "user";
+                    flipBtn.disabled = true;
+                    if (pc) pc.close();
+                    if (stream) stream.getTracks().forEach((t) => t.stop());
+                    stopMeter();
+                    try {
+                        setStatus("正在切换摄像头…");
+                        // 服务端在 Connected 态不收新 offer:先 /stop 让旧
+                        // 会话退场,等它落到 failed 再重新协商。留半秒余量,
+                        // 让会话线程先松手,新 offer 才不会被旧会话的收尾
+                        // 冲掉。
+                        if (running) {
+                            await fetch("/stop", { method: "POST" });
+                            const deadline = Date.now() + 3000;
+                            while (Date.now() < deadline) {
+                                try {
+                                    const res = await fetch("/status");
+                                    const state = await res.json();
+                                    if (
+                                        state.state === "waiting" ||
+                                        state.state === "failed"
+                                    )
+                                        break;
+                                } catch {}
+                                await new Promise((r) => setTimeout(r, 100));
+                            }
+                            await new Promise((r) => setTimeout(r, 500));
+                        }
+                        stream = await getStream();
+                        const vt2 = stream.getVideoTracks()[0];
+                        if (vt2) vt2.contentHint = "motion";
+                        preview.srcObject = stream;
+                        startMeter();
+                        await negotiate();
+                        running = true;
+                        dot.classList.add("on");
+                        void requestWakeLock();
+                        setStatus("已切换");
+                    } catch (e) {
+                        setStatus("切换失败：" + e.message);
+                    }
+                    flipBtn.disabled = false;
+                }
+
+                document
+                    .querySelectorAll("#resGroup button[data-res]")
+                    .forEach((b) => {
+                        b.addEventListener("click", () => {
+                            void switchResolution(b.dataset.res);
+                        });
+                    });
+
+                startBtn.addEventListener("click", start);
+                flipBtn.addEventListener("click", flip);
+                stopBtn.addEventListener("click", () => {
+                    teardown(true);
+                });
+
+                if (
+                    !navigator.mediaDevices ||
+                    !navigator.mediaDevices.getUserMedia
+                ) {
+                    setStatus(
+                        "当前页面不是安全上下文，无法调用摄像头。请通过扫码访问 HTTPS 地址。",
+                    );
+                    startBtn.disabled = true;
+                }
+            })();
+        </script>
+    </body>
+</html>
