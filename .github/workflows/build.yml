@@ -1,0 +1,296 @@
+name: Build
+
+# One workflow, three executables: filmcraft for Windows x64, macOS arm64 and
+# macOS x86_64, each an artifact holding the executable with the FFmpeg
+# libraries it loads at run time beside it.
+#
+# How it is shaped, and why:
+#
+# - `apps/reaction` is not part of this repository (gitignored): it is cloned
+#   from the private fedeaxal/reaction with a personal access token in
+#   REACTION_REPO_TOKEN. `apps/filmcraft` embeds it as a path dependency, so
+#   nothing builds until the clone lands where the manifest looks for it.
+# - The Reaction page is built without its `browser` feature — the default —
+#   so CEF is neither fetched nor compiled nor shipped: no CEF_PATH, no Ninja,
+#   no browser engine in the archive.
+# - FFmpeg arrives through the vendored `media` under apps/reaction, linked
+#   dynamically: `.github/actions/setup-ffmpeg` builds the same pinned vcpkg
+#   tree reaction's own CI does (the action is a copy of its, with the
+#   triplet an input so the Intel Mac job can ask for x64-osx-dynamic), and
+#   the archive carries the runtime libraries beside the executable.
+# - Everything else — codecs, WebRTC, the ASR worker's sherpa-onnx — is pure
+#   Rust or statically linked, and onnxruntime is loaded dynamically and only
+#   for the face pipeline, which degrades gracefully without it. The archive
+#   is the executable and FFmpeg, nothing more.
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      reaction-ref:
+        description: "git ref of fedeaxal/reaction to build against (empty: its default branch)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  # A superseded push's half-built executable is wasted work; nothing here
+  # publishes, so cancelling it costs nothing.
+  cancel-in-progress: true
+
+env:
+  # Nothing reuses a build directory across runs, so incremental compilation
+  # only buys extra artifacts to write.
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      # The other half of the workspace, from the private fork. `GITHUB_TOKEN`
+      # cannot read another repository, private or not — this needs a PAT with
+      # read access to fedeaxal/reaction stored as REACTION_REPO_TOKEN.
+      - name: Check out reaction
+        uses: actions/checkout@v6
+        with:
+          repository: fedeaxal/reaction
+          token: ${{ secrets.REACTION_REPO_TOKEN }}
+          # Empty on push events: the repository's default branch.
+          ref: ${{ inputs.reaction-ref }}
+          path: apps/reaction
+
+      # One command per step: GitHub's pwsh wrapper exits with the *last*
+      # command's `$LASTEXITCODE` and a failing native command does not stop
+      # the script, so a multi-command step swallows every failure but the
+      # final one.
+      - name: Install Rust toolchain
+        shell: pwsh
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Select Rust toolchain
+        shell: pwsh
+        run: rustup default stable
+
+      - name: Set up FFmpeg
+        uses: ./.github/actions/setup-ffmpeg
+        with:
+          triplet: x64-windows
+          vcpkg-features: openh264,nvcodec
+
+      # Downloaded crate sources only, not `target`: the build directory for
+      # this dependency graph runs to several gigabytes of small files, and
+      # saving and restoring that on Windows costs more than recompiling it.
+      # A stale entry here is only a slower build, never a wrong one, so this
+      # one does take a prefix fallback.
+      - name: Cache downloaded crates
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - name: Build
+        shell: pwsh
+        env:
+          # Release builds carry the icon and version info or say why not.
+          FILMCRAFT_REQUIRE_WINRES: "1"
+        run: cargo build --release --locked -p filmcraft
+
+      # Everything in the FFmpeg tree's `bin`, not the few libraries the
+      # executable names: avcodec pulls in openh264, zlib and whatever else
+      # the port's dependencies installed, and those are loaded by name at run
+      # time exactly as the av* ones are. Copying the directory is both
+      # simpler and correct as the port's dependency set changes.
+      - name: Stage the archive
+        shell: pwsh
+        run: |
+          $stage = "dist/filmcraft-x86_64-windows-$($env:GITHUB_SHA.Substring(0, 7))"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item target/release/filmcraft.exe $stage
+          Copy-Item "$env:FFMPEG_DIR/bin/*.dll" $stage
+
+          # The executable and the vcpkg FFmpeg build both link the dynamic
+          # Visual C++ runtime, and a stock Windows does not have it — an
+          # archive without these opens a "VCRUNTIME140.dll was not found" box
+          # instead of the application. The whole `Microsoft.VC*.CRT` folder
+          # rather than a list of file names: it is exactly the set Microsoft
+          # redistributes together, and picking from it by hand is how an
+          # archive ends up missing `vcruntime140_1.dll`.
+          $crt = Get-ChildItem "C:/Program Files/Microsoft Visual Studio/*/*/VC/Redist/MSVC/*/x64/Microsoft.VC*.CRT" -Directory |
+            Sort-Object { [version]$_.Parent.Parent.Name } |
+            Select-Object -Last 1
+          if (-not $crt) { throw "no Visual C++ redistributable found on the runner" }
+          Write-Host "runtime from $($crt.FullName)"
+          Copy-Item "$($crt.FullName)/*.dll" $stage
+
+          # For the steps below, which work on what this one made.
+          "STAGE=$stage" >> $env:GITHUB_ENV
+          Get-ChildItem $stage -Recurse -File | Select-Object FullName, Length
+
+      - name: Check the archive is complete
+        shell: pwsh
+        run: |
+          $stage = $env:STAGE
+          if (-not (Test-Path "$stage/filmcraft.exe")) { throw "no executable in the archive" }
+          # The one failure that stays invisible until the archive is unpacked
+          # on a machine without the FFmpeg tree the build linked against.
+          if (-not (Get-ChildItem "$stage/avcodec-*.dll")) { throw "no FFmpeg libraries in the archive" }
+          # And the one whose absence shows as a dialog box instead of the
+          # application, on any Windows without the redistributable installed.
+          if (-not (Test-Path "$stage/vcruntime140.dll")) { throw "no Visual C++ runtime in the archive" }
+
+      - name: Pack
+        shell: pwsh
+        run: |
+          $stage = $env:STAGE
+          Compress-Archive -Path "$stage/*" -DestinationPath "$stage.zip"
+
+      - name: Upload the archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: filmcraft-x86_64-windows
+          path: dist/*.zip
+          if-no-files-found: error
+
+  # Two macOS builds, one job: they differ in their runner and their vcpkg
+  # triplet and in nothing else. `macos-15-intel` is the last x86_64 image
+  # GitHub offers — when it goes, so does this matrix entry, and with it
+  # Intel macOS support.
+  macos:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            triplet: arm64-osx-dynamic
+            suffix: arm64-macos
+          - runner: macos-15-intel
+            triplet: x64-osx-dynamic
+            suffix: x86_64-macos
+    env:
+      # What makes the archive self-contained: vcpkg's dylibs are named
+      # `@rpath/...`, and the executable searches its own directory before
+      # anywhere else. It must survive as these characters because this is a
+      # value the linker reads, not a shell command.
+      RUSTFLAGS: -C link-arg=-Wl,-rpath,@executable_path
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Check out reaction
+        uses: actions/checkout@v6
+        with:
+          repository: fedeaxal/reaction
+          token: ${{ secrets.REACTION_REPO_TOKEN }}
+          ref: ${{ inputs.reaction-ref }}
+          path: apps/reaction
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Set up FFmpeg
+        uses: ./.github/actions/setup-ffmpeg
+        with:
+          triplet: ${{ matrix.triplet }}
+          vcpkg-features: openh264
+
+      - name: Cache downloaded crates
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      - name: Build
+        run: cargo build --release --locked -p filmcraft
+
+      # The executable plus every dylib the FFmpeg tree installed, beside it:
+      # vcpkg names them `@rpath/...`, they name each other the same way, and
+      # the loader resolves all of that through the executable's own
+      # `@executable_path` rpath. `cp -R` keeps any symlinks symlinks, so a
+      # versioned name and its unversioned alias stay one file, not two.
+      - name: Stage the archive
+        run: |
+          set -euo pipefail
+          stage="dist/filmcraft-${{ matrix.suffix }}-${GITHUB_SHA:0:7}"
+          mkdir -p "$stage"
+          cp target/release/filmcraft "$stage"
+          cp -R "$FFMPEG_DIR"/lib/*.dylib "$stage"
+          # The linker already signed the executable it built; signing it
+          # again says so over anything a later step did to it, and costs
+          # nothing where it did not. Apple silicon runs nothing unsigned.
+          codesign --force --sign - "$stage/filmcraft"
+          # For the steps below, which work on what this one made.
+          echo "STAGE=$stage" >> "$GITHUB_ENV"
+          ls -l "$stage"
+
+      - name: Check the archive is complete
+        run: |
+          set -euo pipefail
+          stage="$STAGE"
+          exe="$stage/filmcraft"
+
+          [ -f "$exe" ] || { echo "no executable in the archive" >&2; exit 1; }
+          # The search path the whole archive rests on. Without it the loader
+          # looks for FFmpeg wherever the machine happens to have a copy.
+          otool -l "$exe" | grep -q 'path @executable_path' \
+            || { echo "no @executable_path rpath on the executable" >&2; exit 1; }
+          # Without FFmpeg beside it the executable does not reach `main`.
+          compgen -G "$stage/libavcodec*.dylib" > /dev/null \
+            || { echo "no FFmpeg libraries in the archive" >&2; exit 1; }
+
+          # Every library anything in the archive asks for has to be
+          # resolvable from inside it: system libraries are the machine's own,
+          # `@rpath/...` names must sit beside the executable, and an absolute
+          # path is a build-machine location (`.vcpkg/installed/...`) that no
+          # user's Mac has — anything here would fail on theirs instead of in
+          # this log.
+          refs=$(
+            for file in "$stage"/*; do
+              otool -L "$file" | tail -n +2 | awk '{print $1}'
+            done
+          )
+          while IFS= read -r ref; do
+            [ -n "$ref" ] || continue
+            case "$ref" in
+              /usr/lib/*|/System/*) ;;
+              @rpath/*)
+                [ -f "$stage/${ref#@rpath/}" ] \
+                  || { echo "missing beside the executable: $ref" >&2; exit 1; } ;;
+              *)
+                echo "reference outside the archive: $ref" >&2; exit 1 ;;
+            esac
+          done <<< "$refs"
+          echo "every library reference resolves inside the archive"
+
+      # `ditto` rather than `zip`: it keeps symlinks, modes and extended
+      # attributes, and a macOS archive that flattens those stops being what
+      # it was staged as.
+      - name: Pack
+        run: |
+          set -euo pipefail
+          stage="$STAGE"
+          ditto -c -k --keepParent "$stage" "$stage.zip"
+
+      - name: Upload the archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: filmcraft-${{ matrix.suffix }}
+          path: dist/*.zip
+          if-no-files-found: error
