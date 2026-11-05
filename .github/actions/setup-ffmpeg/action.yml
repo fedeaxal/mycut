@@ -103,12 +103,14 @@ runs:
         path: .vcpkg
 
     # FFmpeg's `configure` finds OpenH264 through pkg-config; vcpkg fetches
-    # the rest of what it builds with itself. Homebrew leaves it as it is
-    # where the runner already has it.
+    # the rest of what it builds with itself. `nasm` assembles OpenH264's x86
+    # SIMD: the Intel runner image doesn't ship it, and the port's build
+    # fails with "Could not find nasm" without it. Homebrew leaves pkgconf
+    # as it is where the runner already has it.
     - name: Install vcpkg build dependencies (macOS)
       if: steps.ffmpeg.outputs.cache-hit != 'true' && runner.os == 'macOS'
       shell: bash
-      run: brew install pkgconf
+      run: brew install pkgconf nasm
 
     # The exit-code checks stop this step at the command that actually broke.
     # A native failure does not raise a PowerShell error, so without them the
