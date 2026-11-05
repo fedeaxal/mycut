@@ -354,6 +354,11 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
             app.dialog = None;
         }
         app.integrated_titlebar = cfg!(target_os = "macos");
+        // The window's wgpu state exists whether or not filmcraft's own compositor can run
+        // on it: `set_wgpu` drops the compositor on a software rasterizer, but the embedded
+        // Reaction engine builds its compositing device on this very adapter — see
+        // `wgpu_render_state`.
+        app.wgpu_render_state = cc.wgpu_render_state.clone();
         if let Some(rs) = cc.wgpu_render_state.clone()
             && std::env::var_os("FILMCRAFT_CPU_COMPOSITE").is_none()
         {

@@ -126,7 +126,10 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, body: egui::Rect) {
                 );
             })
             .ok();
-        let render_state = app.gpu.as_ref().map(|gpu| gpu.render_state.clone());
+        // The window's own render state, not `gpu`'s: on a software rasterizer the GPU
+        // compositor is dropped and `gpu` is None, while the state still works — the
+        // engine builds its compositing device on this adapter whatever it is.
+        let render_state = app.wgpu_render_state.clone();
         app.reaction = Some(reaction::ObsApp::new_embedded(
             ui.ctx(),
             render_state,
