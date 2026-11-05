@@ -173,6 +173,18 @@ fn main() -> eframe::Result {
         let mut options = native_options(launch.control_port.is_some());
         // Before eframe creates the wgpu instance (e.g. no OpenGL on Windows, see graphics.rs).
         graphics::apply(&mut options, graphics.mode(), backend_override);
+        // Windows 上把 wgpu 钉在 Direct3D 12(用户未用 WGPU_BACKEND 明确指定时)。
+        // 内嵌 Reaction 的预览要求这一点:合成帧经共享纹理交给 wgpu,导入走
+        // `ID3D12Device::OpenSharedHandle`,wgpu 在 Vulkan 下引擎无法启动,画布将
+        // 永远停在「没有合成画面」。独立版 reaction 同样钉 D3D12(它的
+        // pin_windows_backend),能跑本程序 D3D11 合成器的 GPU 必有 D3D12 驱动。
+        // DX12 与软件渲染两种模式本就只枚举 DX12,此处只在默认模式补齐。
+        #[cfg(target_os = "windows")]
+        if backend_override.is_none() && graphics.mode() == graphics::Mode::Default {
+            if let eframe::egui_wgpu::WgpuSetup::CreateNew(create) = &mut options.wgpu_options.wgpu_setup {
+                create.instance_descriptor.backends = eframe::wgpu::Backends::DX12;
+            }
+        }
         let app_created = Arc::new(AtomicBool::new(false));
         let result = eframe::run_native("FilmCraft", options, app_creator(launch.clone(), graphics.clone(), Arc::clone(&app_created)));
         let app_created = app_created.load(Ordering::Relaxed);

@@ -6,4 +6,4 @@ plan/
 .DS_Store
 .claude/worktrees/
 __pycache__/
-/apps/reaction
+apps/reaction

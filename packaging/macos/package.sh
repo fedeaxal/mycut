@@ -34,12 +34,8 @@ case "$ARCH" in
   *) echo "unknown --arch $ARCH" >&2; exit 2 ;;
 esac
 
-# Keep in sync with LSMinimumSystemVersion in Info.plist.in. 13.0, not the
-# 11.0 the main binary alone would need: the vcpkg FFmpeg dylibs this bundle
-# carries are built for 13.0 (see .github/vcpkg-triplets), and they load at
-# startup — below 13 the app would not reach main regardless of what the
-# executable targets.
-export MACOSX_DEPLOYMENT_TARGET=13.0
+# Keep in sync with LSMinimumSystemVersion in Info.plist.in.
+export MACOSX_DEPLOYMENT_TARGET=11.0
 IDENTITY="${MACOS_SIGN_IDENTITY:--}"
 SHORT_VERSION="${VERSION%%-*}"
 WORK="$CARGO_TARGET_DIR/macos-package"
@@ -131,71 +127,11 @@ printf 'APPL????' >"$APP/Contents/PkgInfo"
 # licences of the embedded craft-fonts fonts (builds with CRAFT_FONTS_DIR)
 copy_font_licences "$APP/Contents/Resources"
 
-# FFmpeg and the face pipeline's inference engine link dynamically and are
-# found through the executable's @executable_path rpath — beside it, in
-# Contents/MacOS. Their licences ride in Contents/Resources/licenses. Both
-# are optional CI inputs: without FFMPEG_DIR / ONNXRUNTIME_DIR the build is
-# expected to have resolved them another way (statically), and nothing is
-# copied here.
-licenses="$APP/Contents/Resources/licenses"
-if [[ -n "${FFMPEG_DIR:-}" ]]; then
-  mkdir -p "$licenses"
-  cp "$FFMPEG_DIR"/lib/*.dylib "$APP/Contents/MacOS/"
-  find "$FFMPEG_DIR/share" -name copyright -print0 |
-    while IFS= read -r -d '' file; do
-      cp "$file" "$licenses/$(basename "$(dirname "$file")").txt"
-    done
-fi
-if [[ -n "${ONNXRUNTIME_DIR:-}" && -f "$ONNXRUNTIME_DIR/libonnxruntime.dylib" ]]; then
-  mkdir -p "$licenses"
-  cp "$ONNXRUNTIME_DIR/libonnxruntime.dylib" "$APP/Contents/MacOS/"
-  cp "$ONNXRUNTIME_DIR/LICENSE" "$licenses/onnxruntime-LICENSE.txt"
-  cp "$ONNXRUNTIME_DIR/ThirdPartyNotices.txt" "$licenses/onnxruntime-ThirdPartyNotices.txt"
-fi
-# Ad-hoc-sign every dylib these stages copied, inside-out before the bundle:
-# vcpkg's arm64 dylibs arrive linker-signed, its x86_64 ones unsigned, and
-# the `codesign --verify --deep` below rejects unsigned nested code on
-# either arch. Re-signing changes no load command, only the signature.
-dylib_ts=(--timestamp=none)
-[[ "$IDENTITY" != "-" ]] && dylib_ts=(--timestamp)
-for dylib in "$APP/Contents/MacOS"/*.dylib; do
-  [[ -e "$dylib" ]] || continue
-  codesign --force --sign "$IDENTITY" "${dylib_ts[@]}" "$dylib"
-done
-
 # Sign inside-out: nested code first, then the bundle itself (no --deep on the final signature).
 # Today the only nested code is the main executable; frameworks/helpers would be signed here too.
 sign --options runtime --entitlements "$HERE/entitlements.plist" "$APP/Contents/MacOS/FilmCraft"
 sign --options runtime --entitlements "$HERE/entitlements.plist" "$APP"
 codesign --verify --strict --deep --verbose=2 "$APP"
-
-# The bundle has to carry every library it names. System libraries are the
-# machine's own; `@rpath/...` must resolve inside Contents/MacOS; an
-# absolute path is a build-machine location (`.vcpkg/installed/...`) no
-# user's Mac has. A file's own install name is not one of its dependencies
-# (`otool -L` lists it first all the same), so it is dropped.
-if [[ -n "${FFMPEG_DIR:-}" ]]; then
-  echo "==> checking the bundle is self-contained"
-  compgen -G "$APP/Contents/MacOS/libavcodec*.dylib" >/dev/null \
-    || { echo "no FFmpeg libraries in the bundle" >&2; exit 1; }
-  refs="$(
-    for file in "$APP/Contents/MacOS"/*; do
-      [[ $(file -b "$file") == Mach-O* ]] || continue
-      id="$(otool -D "$file" | sed -n '2p' | awk '{print $1}')"
-      otool -L "$file" | tail -n +2 | awk '{print $1}' | grep -vxF "$id" || true
-    done
-  )"
-  while IFS= read -r ref; do
-    [[ -n "$ref" ]] || continue
-    case "$ref" in
-      /usr/lib/*|/System/*) ;;
-      @rpath/*)
-        [[ -f "$APP/Contents/MacOS/${ref#@rpath/}" ]] \
-          || { echo "missing beside the executable: $ref" >&2; exit 1; } ;;
-      *) echo "reference outside the bundle: $ref" >&2; exit 1 ;;
-    esac
-  done <<< "$refs"
-fi
 
 if [[ "$NOTARIZE" = 1 ]]; then
   ditto -c -k --keepParent "$APP" "$WORK/FilmCraft-notarize.zip"
@@ -244,11 +180,6 @@ ditto -c -k --keepParent "$CLI_DIR" "$CLI_ZIP"
 # A bare Mach-O can't carry a stapled ticket; Gatekeeper looks the notarization up online.
 if [[ "$NOTARIZE" = 1 ]]; then notarize "$CLI_ZIP"; fi
 
-# The CLI links FFmpeg dynamically like the app; give the smoke test the
-# libraries beside it that the bundle gives the app.
-if [[ -n "${FFMPEG_DIR:-}" ]]; then
-  cp "$FFMPEG_DIR"/lib/*.dylib "$WORK/bin/"
-fi
 "$WORK/bin/filmcraft-cli" --version
 echo "==> done"
 ls -lh "$DMG" "$CLI_ZIP"

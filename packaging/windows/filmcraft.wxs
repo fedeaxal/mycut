@@ -3,9 +3,6 @@
   <?ifndef HasCraftFontLicences ?>
   <?define HasCraftFontLicences=0 ?>
   <?endif?>
-  <?ifndef HasRuntimeLibraries ?>
-  <?define HasRuntimeLibraries=0 ?>
-  <?endif?>
   <Package Name="FilmCraft" Manufacturer="Learning Machines LLC" Version="$(var.Version)" UpgradeCode="31E6FB14-9DBC-41DD-B24B-26B71FB31B62" Scope="perUserOrMachine" Compressed="yes" Language="1033">
     <SummaryInformation Description="FilmCraft video editor" Manufacturer="Learning Machines LLC" />
     <?include $(sys.SOURCEFILEDIR)install-policy.wxi?>
@@ -31,10 +28,6 @@
       <?if $(var.HasCraftFontLicences) = 1 ?>
       <ComponentGroupRef Id="CraftFontLicences" />
       <?endif?>
-      <?if $(var.HasRuntimeLibraries) = 1 ?>
-      <ComponentGroupRef Id="RuntimeLibraries" />
-      <ComponentGroupRef Id="RuntimeLicences" />
-      <?endif?>
       <ComponentGroupRef Id="FilmcraftFiles" />
     </Feature>
   <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
@@ -48,16 +41,6 @@
     <?if $(var.HasCraftFontLicences) = 1 ?>
     <ComponentGroup Id="CraftFontLicences" Directory="INSTALLFOLDER">
       <Files Include="$(var.DocsDir)\**" />
-    </ComponentGroup>
-    <?endif?>
-    <?if $(var.HasRuntimeLibraries) = 1 ?>
-    <!-- FFmpeg, ONNX Runtime and the VC++ runtime DLLs the executables load at run time, with
-         their licences: staged by package.ps1 when FFMPEG_DIR / ONNXRUNTIME_DIR are set. -->
-    <ComponentGroup Id="RuntimeLibraries" Directory="INSTALLFOLDER">
-      <Files Include="$(var.BinDir)\*.dll" />
-    </ComponentGroup>
-    <ComponentGroup Id="RuntimeLicences" Directory="INSTALLFOLDER">
-      <Files Include="$(var.LicDir)\**" />
     </ComponentGroup>
     <?endif?>
     <ComponentGroup Id="FilmcraftFiles" Directory="INSTALLFOLDER">
