@@ -92,6 +92,46 @@ Copy-Item (Join-Path $Bin 'filmcraft.exe'), (Join-Path $Bin 'filmcraft-cli.exe')
 
 & (Join-Path $PSScriptRoot 'sign.ps1') (Join-Path $Stage 'filmcraft.exe') (Join-Path $Stage 'filmcraft-cli.exe')
 
+# ---- runtime libraries the executables load at run time ----------------------------------------
+# FFmpeg and the face pipeline's ONNX Runtime link dynamically and are found beside the
+# executable; the FFmpeg DLLs use the dynamic CRT, so the redistributable's DLLs ride along (the
+# executables themselves are /MT). Both are optional CI inputs: without FFMPEG_DIR /
+# ONNXRUNTIME_DIR the build is expected to have resolved them another way (statically), and the
+# installers carry only the executables.
+$HasRuntimeLibs = 0
+$Lic = Join-Path $Stage 'licences'
+if ($env:FFMPEG_DIR) {
+  Copy-Item (Join-Path $env:FFMPEG_DIR 'bin\*.dll') $Stage
+  if (-not (Get-ChildItem (Join-Path $Stage 'avcodec-*.dll') -ErrorAction SilentlyContinue)) {
+    throw 'FFMPEG_DIR\bin carried no avcodec DLL'
+  }
+  New-Item -ItemType Directory -Force -Path $Lic | Out-Null
+  Get-ChildItem (Join-Path $env:FFMPEG_DIR 'share') -Filter copyright -Recurse |
+    ForEach-Object { Copy-Item $_.FullName (Join-Path $Lic "$($_.Directory.Name).txt") }
+  $HasRuntimeLibs = 1
+}
+if ($env:ONNXRUNTIME_DIR) {
+  Copy-Item (Join-Path $env:ONNXRUNTIME_DIR '*.dll') $Stage
+  if (-not (Test-Path (Join-Path $Stage 'onnxruntime.dll'))) {
+    throw 'ONNXRUNTIME_DIR carried no onnxruntime.dll'
+  }
+  New-Item -ItemType Directory -Force -Path $Lic | Out-Null
+  Copy-Item (Join-Path $env:ONNXRUNTIME_DIR 'LICENSE') (Join-Path $Lic 'onnxruntime-LICENSE.txt')
+  Copy-Item (Join-Path $env:ONNXRUNTIME_DIR 'ThirdPartyNotices.txt') (Join-Path $Lic 'onnxruntime-ThirdPartyNotices.txt')
+  $HasRuntimeLibs = 1
+}
+if ($HasRuntimeLibs -eq 1) {
+  # The whole Microsoft.VC*.CRT folder rather than a list of file names: it is exactly the set
+  # Microsoft redistributes together, and picking from it by hand is how an install ends up
+  # missing vcruntime140_1.dll.
+  $crt = Get-ChildItem 'C:/Program Files/Microsoft Visual Studio/*/*/VC/Redist/MSVC/*/x64/Microsoft.VC*.CRT' -Directory |
+    Sort-Object { [version]$_.Parent.Parent.Name } |
+    Select-Object -Last 1
+  if (-not $crt) { throw 'no Visual C++ redistributable found on the runner (the FFmpeg DLLs need it)' }
+  Write-Output "CRT DLLs from $($crt.FullName)"
+  Copy-Item (Join-Path $crt.FullName '*.dll') $Stage
+}
+
 # ---- font notices for the MSI ------------------------------------------------------------------
 # The portable ZIP already carries these notices; stage the complete files before MSI creation too.
 $Docs = Join-Path $Stage 'font-licences'
@@ -112,6 +152,7 @@ Invoke-Native 'wix build' {
   wix build (Join-Path $PSScriptRoot 'filmcraft.wxs') -arch $Arch -ext WixToolset.UI.wixext `
     -d "Version=$MsiVersion" -d "BinDir=$Stage" -d "IconPath=$(Join-Path $Root 'assets\app-icon\filmcraft.ico')" `
     -d "DocsDir=$Docs" -d "HasCraftFontLicences=$HasCraftFontLicences" `
+    -d "LicDir=$Lic" -d "HasRuntimeLibraries=$HasRuntimeLibs" `
     -o $Msi
 }
 # Check the compiled scope, path and registration contract before signing.
@@ -125,6 +166,12 @@ $Portable = Join-Path $TargetDir "windows-package\filmcraft-$Version-windows-$Ar
 Remove-Item -Recurse -Force $Portable -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $Portable | Out-Null
 Copy-Item (Join-Path $Stage '*.exe') $Portable
+# The runtime libraries beside the executable are what make the zip work on a stock machine
+# (FFmpeg and its CRT) and let the face pipeline run (ONNX Runtime); their licences follow.
+if ($HasRuntimeLibs -eq 1) {
+  Copy-Item (Join-Path $Stage '*.dll') $Portable
+  Copy-Item $Lic $Portable -Recurse
+}
 # The marker that makes FilmCraft keep its data in .\data next to the exe instead of %APPDATA% (#139).
 Set-Content -Encoding ascii -Path (Join-Path $Portable 'portable.txt') -Value @(
   'FilmCraft portable: preferences, presets, logs and crash recovery are kept in the data folder',
