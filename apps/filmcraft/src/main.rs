@@ -173,12 +173,13 @@ fn main() -> eframe::Result {
         let mut options = native_options(launch.control_port.is_some());
         // Before eframe creates the wgpu instance (e.g. no OpenGL on Windows, see graphics.rs).
         graphics::apply(&mut options, graphics.mode(), backend_override);
-        // Windows 上把 wgpu 钉在 Direct3D 12(用户未用 WGPU_BACKEND 明确指定时)。
-        // 内嵌 Reaction 的预览要求这一点:合成帧经共享纹理交给 wgpu,导入走
-        // `ID3D12Device::OpenSharedHandle`,wgpu 在 Vulkan 下引擎无法启动,画布将
-        // 永远停在「没有合成画面」。独立版 reaction 同样钉 D3D12(它的
-        // pin_windows_backend),能跑本程序 D3D11 合成器的 GPU 必有 D3D12 驱动。
-        // DX12 与软件渲染两种模式本就只枚举 DX12,此处只在默认模式补齐。
+        // Windows: same pin as the standalone app(reaction 的 `pin_windows_backend`)。
+        // 内嵌 Reaction 的预览把合成帧以 D3D11 共享纹理交给 wgpu,打开它只有
+        // `ID3D12Device::OpenSharedHandle` 一条路;wgpu 自选时 Vulkan 排在 DX12
+        // 前面,而 Vulkan 下这条导入要走 `VK_KHR_external_memory_win32`,本程序
+        // 没有实现——引擎起不来,画布永远停在「没有合成画面」。独立版正是靠
+        // 这一行在 Windows 上正常出画面的。用户用 WGPU_BACKEND 明确指定时不
+        // 掺和;软件渲染与 dx12 两种模式本来就只枚举 DX12,这里补的是默认模式。
         #[cfg(target_os = "windows")]
         if backend_override.is_none() && graphics.mode() == graphics::Mode::Default {
             if let eframe::egui_wgpu::WgpuSetup::CreateNew(create) = &mut options.wgpu_options.wgpu_setup {
@@ -354,10 +355,9 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
             app.dialog = None;
         }
         app.integrated_titlebar = cfg!(target_os = "macos");
-        // The window's wgpu state exists whether or not filmcraft's own compositor can run
-        // on it: `set_wgpu` drops the compositor on a software rasterizer, but the embedded
-        // Reaction engine builds its compositing device on this very adapter — see
-        // `wgpu_render_state`.
+        // The window's wgpu state, kept whether or not filmcraft's own compositor can run on it:
+        // `set_wgpu` drops the compositor on a software rasterizer, and the embedded Reaction
+        // engine still has to composite onto this very device — see `wgpu_render_state`.
         app.wgpu_render_state = cc.wgpu_render_state.clone();
         if let Some(rs) = cc.wgpu_render_state.clone()
             && std::env::var_os("FILMCRAFT_CPU_COMPOSITE").is_none()
