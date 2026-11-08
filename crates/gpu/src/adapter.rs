@@ -135,11 +135,30 @@ pub(crate) fn native_instance() -> wgpu::Instance {
 /// features among those that are the same GPU listed by the same driver (the first of them when
 /// several expose as many). `None` without a usable adapter.
 pub fn choose(candidates: &[Candidate], power: PowerPreference) -> Option<usize> {
+    choose_for(candidates, power, cfg!(target_os = "windows"))
+}
+
+/// [`choose`] with the platform named, so tests can run the rule both ways.
+pub fn choose_for(candidates: &[Candidate], power: PowerPreference, windows: bool) -> Option<usize> {
     let first = wgpu_choice(candidates, power)?;
     let Some(preferred) = candidates.get(first) else {
         return Some(first);
     };
     if let Some(dx12) = dx12_instead(candidates, preferred) {
+        return Some(dx12);
+    }
+    // On Windows, wgpu's own rule takes a GPU's Vulkan entry and leaves its DirectX 12 one
+    // unused. The embedded Reaction engine hands its composited frames to wgpu through a
+    // D3D12 shared-texture import (written against no other backend — see reaction's
+    // `engine::preview`), which needs the window itself on DirectX 12; the standalone
+    // application therefore pins the whole of wgpu there. Here the same outcome is reached
+    // one GPU at a time: when the GPU wgpu would draw with also lists a usable DirectX 12
+    // entry, that entry is taken. A GPU (or a machine) without one stays on Vulkan, so the
+    // window still opens where DirectX 12 does not reach — the Reaction engine then refuses
+    // to start with the reason, rather than the application losing its window.
+    if windows
+        && let Some(dx12) = dx12_of_same_gpu(candidates, preferred)
+    {
         return Some(dx12);
     }
     let versions = candidates.iter().enumerate().filter(|(_, c)| c.usable && same_gpu_and_driver(preferred, c));
@@ -175,6 +194,25 @@ fn dx12_instead(candidates: &[Candidate], preferred: &Candidate) -> Option<usize
     candidates.iter().position(|c| c.usable && c.backend == Backend::Dx12 && c.vendor == INTEL && c.device == preferred.device)
 }
 
+/// The index of a usable DirectX 12 entry of the same physical GPU as `preferred`, when
+/// `preferred` is not itself one. One GPU's Vulkan and DirectX 12 entries share the PCI vendor
+/// and device ids and the bus, but not the driver name (each backend reports its own), so this
+/// compares ids and the bus where both report one. Adapters without PCI ids (both zero) are
+/// refused: two of them cannot be told apart, and sharing textures across the wrong pair would
+/// hand the Reaction engine a frame source on another GPU.
+fn dx12_of_same_gpu(candidates: &[Candidate], preferred: &Candidate) -> Option<usize> {
+    if preferred.backend == Backend::Dx12 || (preferred.vendor == 0 && preferred.device == 0) {
+        return None;
+    }
+    candidates.iter().position(|c| {
+        c.usable
+            && c.backend == Backend::Dx12
+            && c.vendor == preferred.vendor
+            && c.device == preferred.device
+            && (c.pci_bus_id.is_empty() || preferred.pci_bus_id.is_empty() || c.pci_bus_id == preferred.pci_bus_id)
+    })
+}
+
 /// [`choose`] over enumerated adapters, as egui-wgpu's `native_adapter_selector` for the window
 /// (`surface`), and for the off-screen export device (no surface). The adapters and the choice go
 /// to the log.
@@ -198,10 +236,17 @@ pub fn pick(adapters: &[Adapter], surface: Option<&Surface<'_>>, power: PowerPre
         );
     }
     if let Some(wgpu_own) = wgpu_choice(&candidates, power).and_then(|i| candidates.get(i))
-        && wgpu_own.backend == Backend::Vulkan
+        && wgpu_own.backend != Backend::Dx12
         && chosen.backend == Backend::Dx12
     {
-        log::warn!("Intel's Vulkan driver for \"{}\" crashes when the device is created (#512): drawing through DirectX 12", wgpu_own.name);
+        if wgpu_own.vendor == INTEL && intel_gen9_to_gen11(wgpu_own.device) {
+            log::warn!("Intel's Vulkan driver for \"{}\" crashes when the device is created (#512): drawing through DirectX 12", wgpu_own.name);
+        } else if cfg!(target_os = "windows") {
+            log::info!(
+                "\"{}\" also lists a DirectX 12 entry: drawing through it, which the embedded Reaction engine's shared frames go through",
+                wgpu_own.name
+            );
+        }
     }
     log::info!("graphics adapter chosen: {chosen}");
     Ok(adapter.clone())
@@ -218,6 +263,13 @@ mod tests {
     const RX_6800M: u32 = 0x73df;
     const RADEON_IGPU: u32 = 0x1638;
     const POWERS: [PowerPreference; 3] = [PowerPreference::None, LowPower, HighPerformance];
+
+    /// The rule that holds on every platform: wgpu's own choice, the newer version of a driver
+    /// listed twice, and the Intel Gen 9–11 workaround. The tests below describe that rule; the
+    /// Windows DirectX 12 preference on top of it has its own tests, so each stays readable.
+    fn choose(adapters: &[Candidate], power: PowerPreference) -> Option<usize> {
+        choose_for(adapters, power, false)
+    }
 
     #[expect(clippy::too_many_arguments, reason = "one line per adapter in the listings below")]
     fn gpu(
@@ -396,6 +448,52 @@ mod tests {
         assert_eq!(choose(&discrete, HighPerformance), Some(0));
     }
 
+    /// On Windows one GPU draws through its DirectX 12 entry even though wgpu lists its Vulkan
+    /// entry first: the embedded Reaction engine's composited frames reach wgpu through a D3D12
+    /// shared-texture import, which is written against no other backend. Where DirectX 12 does
+    /// not reach, the Vulkan choice stands and the window still opens.
+    #[test]
+    fn on_windows_one_gpu_draws_through_its_directx_12_entry() {
+        // the G513QY again: both GPUs through both backends. wgpu's rule takes each GPU's
+        // Vulkan entry; the preference moves it to that GPU's DirectX 12 entry.
+        assert_eq!(wgpu_choice(&g513qy(), HighPerformance), Some(0), "wgpu takes the stale Vulkan entry");
+        assert_eq!(choose_for(&g513qy(), HighPerformance, true), Some(3));
+        assert_eq!(choose_for(&g513qy(), PowerPreference::None, true), Some(3));
+        assert_eq!(choose_for(&g513qy(), LowPower, true), Some(4), "low power takes the integrated GPU's DirectX 12 entry");
+        // either order of the backends
+        let mut dx12_first = g513qy();
+        dx12_first.rotate_left(3);
+        for power in POWERS {
+            assert_eq!(choose_for(&dx12_first, power, true), wgpu_choice(&dx12_first, power), "{power:?}");
+        }
+        // no DirectX 12 entry of the GPU: wgpu's choice stands, versions and all (the stale
+        // RX 6800M entry loses to its newer version exactly as without the preference)
+        let vulkan_only: Vec<Candidate> = g513qy().into_iter().take(3).collect();
+        for power in POWERS {
+            assert_eq!(choose_for(&vulkan_only, power, true), choose_for(&vulkan_only, power, false), "{power:?}");
+        }
+        // an DirectX 12 entry that cannot draw to the window is not taken
+        let mut dx12_unusable = g513qy();
+        if let Some(c) = dx12_unusable.get_mut(3) {
+            c.usable = false;
+        }
+        assert_eq!(choose_for(&dx12_unusable, HighPerformance, true), Some(1));
+        // another GPU's DirectX 12 entry is not taken for it: the buses differ
+        let mut other_gpu = g513qy();
+        if let Some(c) = other_gpu.get_mut(3) {
+            c.pci_bus_id = "0000:09:00.0".into();
+        }
+        for c in other_gpu.iter_mut().take(3) {
+            c.pci_bus_id = "0000:03:00.0".into();
+        }
+        assert_eq!(choose_for(&other_gpu, HighPerformance, true), Some(1), "only the Vulkan version dedup applies");
+        // software-only: the one adapter is DirectX 12 already (WARP), and the choice is wgpu's
+        let warp_only: Vec<Candidate> = g513qy().into_iter().skip(5).collect();
+        for power in POWERS {
+            assert_eq!(choose_for(&warp_only, power, true), wgpu_choice(&warp_only, power), "{power:?}");
+        }
+    }
+
     #[test]
     fn gen9_to_gen11_ids() {
         // one id of each family: Skylake, Broxton (twice: one shares Haswell's prefix), Gemini Lake,
@@ -465,7 +563,8 @@ mod tests {
 
     /// Against the adapters of the machine running the tests: [`wgpu_choice`] is what wgpu's
     /// `request_adapter` returns, and [`pick`] returns that adapter too, a version of it exposing
-    /// more features, or for an Intel Gen 9 to Gen 11 GPU its DirectX 12 entry.
+    /// more features, for an Intel Gen 9 to Gen 11 GPU its DirectX 12 entry, and on Windows the
+    /// same GPU's DirectX 12 entry whenever it has one.
     #[test]
     fn on_this_host_the_choice_is_wgpus_unless_its_driver_is_listed_twice() {
         if wgpu::Instance::enabled_backend_features().is_empty() {
@@ -486,7 +585,12 @@ mod tests {
                     let newer_version = same_gpu_and_driver(wgpu_own, picked) && picked.features > wgpu_own.features;
                     let intel_dx12 =
                         wgpu_own.vendor == INTEL && intel_gen9_to_gen11(wgpu_own.device) && picked.backend == Backend::Dx12 && picked.device == wgpu_own.device;
-                    assert!(newer_version || intel_dx12, "{power:?}: {picked} instead of {wgpu_own}");
+                    // On Windows the same GPU's DirectX 12 entry is taken over its Vulkan one.
+                    let windows_dx12 = cfg!(target_os = "windows")
+                        && picked.backend == Backend::Dx12
+                        && picked.vendor == wgpu_own.vendor
+                        && picked.device == wgpu_own.device;
+                    assert!(newer_version || intel_dx12 || windows_dx12, "{power:?}: {picked} instead of {wgpu_own}");
                 }
                 _ => assert_eq!(picked, wgpu_own, "{power:?}"),
             }

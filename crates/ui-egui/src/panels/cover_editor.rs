@@ -53,7 +53,8 @@ pub fn open(app: &mut FilmcraftApp, ctx: &egui::Context, recording_scene: Option
         log::error!("could not load reaction settings: {error}");
         reaction::AppSettings::default()
     });
-    // The window's device, not `gpu`'s — the compositor may be unavailable, the device is not.
+    // 与 Reaction 页同一来源:窗口的 wgpu 设备,宿主 GPU 合成器关闭时也在
+    // (软件光栅机器上没有它引擎不会启动),见 `app::gpu::set_wgpu`。
     let render_state = app.wgpu_render_state.clone();
     CoverEditor {
         // 语言跟随宿主,映射与 Reaction 页共用(reaction::host_locale)。

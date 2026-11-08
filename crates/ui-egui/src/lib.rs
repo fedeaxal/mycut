@@ -425,10 +425,12 @@ pub struct FilmcraftApp {
     pub(crate) stale_clipboard_media: Option<String>,
     /// GPU compositor (when running on wgpu): device state + compositor + the egui texture it feeds.
     pub gpu: Option<GpuState>,
-    /// The window's wgpu state, whether or not the GPU compositor runs on it. `set_wgpu` drops
-    /// the compositor on a software rasterizer or an adapter without the formats it needs, but
-    /// the state itself is still the window's — and it is what the embedded Reaction engine
-    /// composites onto (see `panels::reaction`). `None` without wgpu at all.
+    /// The wgpu device the window paints with, whether or not the GPU compositor runs on it.
+    /// The embedded Reaction page (and the cover editor) draw through this device — its
+    /// shared-texture import and egui texture live here — even when the host composites its
+    /// own previews on the CPU (software rasterizer, `FILMCRAFT_CPU_COMPOSITE`): without it
+    /// the Reaction engine never starts and the canvas stays "no frame". Set from the
+    /// creation context by the host (see `app::gpu::set_wgpu`); `None` on a glow/web host.
     pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
     /// Preview render job being watched (job id, where to start playing when it completes).
     watched_render: Option<(u64, Tick)>,

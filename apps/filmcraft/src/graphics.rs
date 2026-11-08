@@ -445,7 +445,8 @@ fn apply_for(options: &mut NativeOptions, mode: Mode, backend_override: Option<B
         // selection or any Rust error handling runs, so the window never appears. Choosing an
         // adapter afterwards is too late: only leaving GL out of the instance avoids it. Keep
         // Vulkan and DX12 both: forcing DX12 alone leaves machines without DX12 with no backend
-        // at all.
+        // at all. Between the two the selector takes a GPU's DX12 entry when it has one
+        // (`filmcraft_gpu::adapter`), which the embedded Reaction engine's shared frames need.
         Mode::Default if windows => {
             create.instance_descriptor.backends = backend_override.unwrap_or(Backends::PRIMARY);
             // wgpu's own choice of adapter, except for a GPU that Windows lists through two

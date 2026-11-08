@@ -173,19 +173,6 @@ fn main() -> eframe::Result {
         let mut options = native_options(launch.control_port.is_some());
         // Before eframe creates the wgpu instance (e.g. no OpenGL on Windows, see graphics.rs).
         graphics::apply(&mut options, graphics.mode(), backend_override);
-        // Windows: same pin as the standalone app(reaction 的 `pin_windows_backend`)。
-        // 内嵌 Reaction 的预览把合成帧以 D3D11 共享纹理交给 wgpu,打开它只有
-        // `ID3D12Device::OpenSharedHandle` 一条路;wgpu 自选时 Vulkan 排在 DX12
-        // 前面,而 Vulkan 下这条导入要走 `VK_KHR_external_memory_win32`,本程序
-        // 没有实现——引擎起不来,画布永远停在「没有合成画面」。独立版正是靠
-        // 这一行在 Windows 上正常出画面的。用户用 WGPU_BACKEND 明确指定时不
-        // 掺和;软件渲染与 dx12 两种模式本来就只枚举 DX12,这里补的是默认模式。
-        #[cfg(target_os = "windows")]
-        if backend_override.is_none() && graphics.mode() == graphics::Mode::Default {
-            if let eframe::egui_wgpu::WgpuSetup::CreateNew(create) = &mut options.wgpu_options.wgpu_setup {
-                create.instance_descriptor.backends = eframe::wgpu::Backends::DX12;
-            }
-        }
         let app_created = Arc::new(AtomicBool::new(false));
         let result = eframe::run_native("FilmCraft", options, app_creator(launch.clone(), graphics.clone(), Arc::clone(&app_created)));
         let app_created = app_created.load(Ordering::Relaxed);
@@ -355,14 +342,15 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
             app.dialog = None;
         }
         app.integrated_titlebar = cfg!(target_os = "macos");
-        // The window's wgpu state, kept whether or not filmcraft's own compositor can run on it:
-        // `set_wgpu` drops the compositor on a software rasterizer, and the embedded Reaction
-        // engine still has to composite onto this very device — see `wgpu_render_state`.
-        app.wgpu_render_state = cc.wgpu_render_state.clone();
-        if let Some(rs) = cc.wgpu_render_state.clone()
-            && std::env::var_os("FILMCRAFT_CPU_COMPOSITE").is_none()
-        {
-            app.set_wgpu(rs);
+        if let Some(rs) = cc.wgpu_render_state.clone() {
+            // The embedded Reaction page needs the window's wgpu device even when the host
+            // composites its own previews on the CPU (software rasterizer, or the
+            // FILMCRAFT_CPU_COMPOSITE escape hatch): without it the Reaction engine never
+            // starts. See `filmcraft_ui_egui`'s `wgpu_render_state`.
+            app.wgpu_render_state = Some(rs.clone());
+            if std::env::var_os("FILMCRAFT_CPU_COMPOSITE").is_none() {
+                app.set_wgpu(rs);
+            }
         }
         // Keep device selection available even when the default device is unavailable.
         // Settings ▸ Audio Hardware is applied on the first frame (`apply_prefs`).

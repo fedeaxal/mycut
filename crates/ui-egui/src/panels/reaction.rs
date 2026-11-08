@@ -126,20 +126,11 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, body: egui::Rect) {
                 );
             })
             .ok();
-        // The window's own wgpu device, not `gpu`'s: the GPU compositor is dropped when the
-        // adapter is a software one, while the device is still there — and it is the device the
-        // Reaction engine composites onto.
+        // The window's wgpu device — kept even when the host's own GPU compositor is off
+        // (software rasterizer, FILMCRAFT_CPU_COMPOSITE): the engine's shared-texture
+        // import and egui texture live on it, and without it the engine never starts
+        // (the canvas would show "no frame" forever). See `app::gpu::set_wgpu`.
         let render_state = app.wgpu_render_state.clone();
-        match render_state.as_ref() {
-            // One line naming the device the engine will build its D3D11 side on: a Vulkan
-            // backend cannot take the D3D11 shared texture, and a software adapter cannot
-            // share one with a hardware D3D11 device.
-            Some(rs) => {
-                let info = rs.adapter.get_info();
-                log::info!("Reaction on wgpu {:?} \"{}\" ({:?})", info.backend, info.name, info.device_type);
-            }
-            None => log::error!("no wgpu device in this window: the Reaction engine cannot start"),
-        }
         app.reaction = Some(reaction::ObsApp::new_embedded(
             ui.ctx(),
             render_state,
