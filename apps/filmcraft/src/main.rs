@@ -97,14 +97,6 @@ fn main() -> eframe::Result {
         std::process::exit(code);
     }
 
-    // The encoder probe is this same executable started again with
-    // `--encoder-probe` (see `reaction::engine::output`): opening a hardware
-    // encoder can fault inside a vendor's DLL, and the probe dies rather than
-    // the application.
-    if let Some(code) = reaction::encoder_probe_worker_process() {
-        std::process::exit(code);
-    }
-
     // Windows: the update helper is a copy of this program started with `--finish-update`.
     #[cfg(windows)]
     if let Some(result) = craft_update::self_update::finish(&filmcraft_ui_egui::UPDATE_APP, &std::env::args_os().skip(1).collect::<Vec<_>>()) {
@@ -350,15 +342,10 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
             app.dialog = None;
         }
         app.integrated_titlebar = cfg!(target_os = "macos");
-        if let Some(rs) = cc.wgpu_render_state.clone() {
-            // The embedded Reaction page needs the window's wgpu device even when the host
-            // composites its own previews on the CPU (software rasterizer, or the
-            // FILMCRAFT_CPU_COMPOSITE escape hatch): without it the Reaction engine never
-            // starts. See `filmcraft_ui_egui`'s `wgpu_render_state`.
-            app.wgpu_render_state = Some(rs.clone());
-            if std::env::var_os("FILMCRAFT_CPU_COMPOSITE").is_none() {
-                app.set_wgpu(rs);
-            }
+        if let Some(rs) = cc.wgpu_render_state.clone()
+            && std::env::var_os("FILMCRAFT_CPU_COMPOSITE").is_none()
+        {
+            app.set_wgpu(rs);
         }
         // Keep device selection available even when the default device is unavailable.
         // Settings ▸ Audio Hardware is applied on the first frame (`apply_prefs`).

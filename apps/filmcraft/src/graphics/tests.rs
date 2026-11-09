@@ -30,16 +30,15 @@ fn no_mode_validates_indirect_calls() {
 }
 
 #[test]
-fn windows_default_leaves_out_gl() {
+fn windows_default_pins_dx12() {
     // eframe's own default (PRIMARY | GL) would initialize OpenGL as well.
     let WgpuSetup::CreateNew(eframe_default) = NativeOptions::default().wgpu_options.wgpu_setup else {
         panic!("default native options must create a wgpu instance");
     };
     assert!(eframe_default.instance_descriptor.backends.contains(Backends::GL));
     let (backends, selector) = configured(Mode::Default, None, true);
-    assert_eq!(backends, Backends::PRIMARY);
-    assert!(!backends.contains(Backends::GL));
-    assert!(backends.contains(Backends::DX12) && backends.contains(Backends::VULKAN));
+    // DX12 only: the Reaction page's shared textures are opened through DX12 (graphics.rs).
+    assert_eq!(backends, Backends::DX12);
     // and chooses the adapter itself: a GPU listed through two versions of one driver
     assert!(selector);
 }

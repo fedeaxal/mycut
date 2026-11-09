@@ -126,11 +126,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, body: egui::Rect) {
                 );
             })
             .ok();
-        // The window's wgpu device — kept even when the host's own GPU compositor is off
-        // (software rasterizer, FILMCRAFT_CPU_COMPOSITE): the engine's shared-texture
-        // import and egui texture live on it, and without it the engine never starts
-        // (the canvas would show "no frame" forever). See `app::gpu::set_wgpu`.
-        let render_state = app.wgpu_render_state.clone();
+        let render_state = app.gpu.as_ref().map(|gpu| gpu.render_state.clone());
         app.reaction = Some(reaction::ObsApp::new_embedded(
             ui.ctx(),
             render_state,

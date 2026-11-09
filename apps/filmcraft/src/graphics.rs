@@ -6,11 +6,12 @@
 //! handling runs, so every launch died the same way until the user set `WGPU_BACKEND` by hand.
 //!
 //! # The adapter
-//! In the default mode on Windows the adapter is wgpu's own choice, except for a GPU that Vulkan
-//! lists through two installed versions of one driver: there the newer one draws, because a
-//! window drawn through the stale one dies inside the driver (`amdvlk64.dll`; see
-//! `filmcraft_gpu::adapter`). That case is avoided up front instead of left to the fallback
-//! below, which would end in DirectX 12 only.
+//! In the default mode on Windows the backend is DirectX 12, because the embedded Reaction page
+//! opens the D3D11 compositor's frames as shared textures, which only a DX12 device can do (the
+//! standalone application pins DX12 for the same reason). The adapter is wgpu's own choice among
+//! the DX12 entries, except for a GPU that is listed through two installed versions of one
+//! driver: there the newer one draws, because a window drawn through the stale one dies inside
+//! the driver (`amdvlk64.dll`; see `filmcraft_gpu::adapter`).
 //!
 //! # When a start counts as failed
 //! The data folder keeps the mode to start with and the failed starts in a row in it
@@ -443,12 +444,18 @@ fn apply_for(options: &mut NativeOptions, mode: Mode, backend_override: Option<B
         // eframe's default (`WGPU_BACKEND`, else PRIMARY | GL), except on Windows: there it
         // includes GL. Creating that backend can crash inside AMD's atio6axx.dll before adapter
         // selection or any Rust error handling runs, so the window never appears. Choosing an
-        // adapter afterwards is too late: only leaving GL out of the instance avoids it. Keep
-        // Vulkan and DX12 both: forcing DX12 alone leaves machines without DX12 with no backend
-        // at all. Between the two the selector takes a GPU's DX12 entry when it has one
-        // (`filmcraft_gpu::adapter`), which the embedded Reaction engine's shared frames need.
+        // adapter afterwards is too late: only leaving GL out of the instance avoids it. On
+        // Windows the pick is DX12, for the shared-texture import the Reaction page needs — see
+        // the comment in the arm below.
         Mode::Default if windows => {
-            create.instance_descriptor.backends = backend_override.unwrap_or(Backends::PRIMARY);
+            // DX12, not wgpu's own pick among Vulkan and DX12: the embedded Reaction page's
+            // D3D11 compositor hands its frames over as shared textures, and opening one is
+            // `ID3D12Device::OpenSharedHandle` — on Vulkan that import has no implementation,
+            // so the canvas would stay empty ("no composite"). The standalone application
+            // pins DX12 for the same reason (`pin_windows_backend`), and every GPU that runs
+            // the D3D11 compositor has a D3D12 driver, so nothing is excluded. This also
+            // sidesteps the Vulkan drivers above that crash at start-up.
+            create.instance_descriptor.backends = backend_override.unwrap_or(Backends::DX12);
             // wgpu's own choice of adapter, except for a GPU that Windows lists through two
             // versions of one driver: the first entry can be a stale one that crashes inside the
             // driver (`filmcraft_gpu::adapter`). A selector replaces `power_preference`
