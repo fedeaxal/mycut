@@ -97,6 +97,14 @@ fn main() -> eframe::Result {
         std::process::exit(code);
     }
 
+    // The encoder probe is this same executable started again with
+    // `--encoder-probe` (see `reaction::engine::output`): opening a hardware
+    // encoder can fault inside a vendor's DLL, and the probe dies rather than
+    // the application.
+    if let Some(code) = reaction::encoder_probe_worker_process() {
+        std::process::exit(code);
+    }
+
     // Windows: the update helper is a copy of this program started with `--finish-update`.
     #[cfg(windows)]
     if let Some(result) = craft_update::self_update::finish(&filmcraft_ui_egui::UPDATE_APP, &std::env::args_os().skip(1).collect::<Vec<_>>()) {
