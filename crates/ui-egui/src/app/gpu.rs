@@ -3,6 +3,9 @@ use super::{FilmcraftApp, FrameKey, GpuState, frames, gpu_compositor_unsupported
 impl FilmcraftApp {
     /// Enable the GPU compositor on the eframe wgpu device.
     pub fn set_wgpu(&mut self, rs: eframe::egui_wgpu::RenderState) {
+        // Kept whatever the check below decides: the embedded Reaction page builds its engine
+        // on this device even where the host's own compositor cannot — see the field's docs.
+        self.wgpu_render_state = Some(rs.clone());
         if let Some(why) = gpu_compositor_unsupported(&rs.adapter) {
             log::warn!("GPU compositor disabled ({why}); compositing on the CPU");
             // Say so instead of letting the preview quietly crawl: "GPU 0 %, CPU 100 %" with no

@@ -53,7 +53,8 @@ pub fn open(app: &mut FilmcraftApp, ctx: &egui::Context, recording_scene: Option
         log::error!("could not load reaction settings: {error}");
         reaction::AppSettings::default()
     });
-    let render_state = app.gpu.as_ref().map(|gpu| gpu.render_state.clone());
+    // 与 Reaction 页同理:引擎设备与宿主合成器是否可用该设备无关。
+    let render_state = app.wgpu_render_state.clone();
     CoverEditor {
         // 语言跟随宿主,映射与 Reaction 页共用(reaction::host_locale)。
         obs: reaction::ObsApp::new_embedded_cover(

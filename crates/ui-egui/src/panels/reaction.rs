@@ -126,7 +126,9 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, body: egui::Rect) {
                 );
             })
             .ok();
-        let render_state = app.gpu.as_ref().map(|gpu| gpu.render_state.clone());
+        // 引擎建在宿主窗口的 wgpu 设备上,与宿主自己的合成器能否用该设备无关
+        // (纯软件适配器的机器上宿主合成走 CPU,而 reaction 预览仍走这里)。
+        let render_state = app.wgpu_render_state.clone();
         app.reaction = Some(reaction::ObsApp::new_embedded(
             ui.ctx(),
             render_state,
