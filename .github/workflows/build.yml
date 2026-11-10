@@ -60,13 +60,13 @@ jobs:
     runs-on: windows-2025
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # The other half of the workspace, from the private fork. `GITHUB_TOKEN`
       # cannot read another repository, private or not — this needs a PAT with
       # read access to fedeaxal/reaction stored as REACTION_REPO_TOKEN.
       - name: Check out reaction
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: fedeaxal/reaction
           token: ${{ secrets.REACTION_REPO_TOKEN }}
@@ -98,7 +98,7 @@ jobs:
       # A stale entry here is only a slower build, never a wrong one, so this
       # one does take a prefix fallback.
       - name: Cache downloaded crates
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry/index
@@ -152,7 +152,7 @@ jobs:
         run: pwsh packaging/windows/package.ps1 -Arch x64
 
       - name: Upload the artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: filmcraft-x86_64-windows
           path: |
@@ -194,10 +194,10 @@ jobs:
       RUSTFLAGS: -C link-arg=-Wl,-rpath,@executable_path
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Check out reaction
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: fedeaxal/reaction
           token: ${{ secrets.REACTION_REPO_TOKEN }}
@@ -216,7 +216,7 @@ jobs:
           vcpkg-features: openh264
 
       - name: Cache downloaded crates
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry/index
@@ -263,7 +263,7 @@ jobs:
           ONNXRUNTIME_DIR: ${{ github.workspace }}/.onnxruntime
 
       - name: Upload the artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: filmcraft-${{ matrix.suffix }}
           path: |
