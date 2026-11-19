@@ -27,7 +27,7 @@
 //! * **Media** — H.264 payloads go through [`H264Depacketizer`] → the
 //!   studio's own `filmcraft-h264` (see `phone_decode`) → the video sink; Opus
 //!   payloads are Opus packets already, decoded by the studio's own
-//!   `filmcraft-opus` to interleaved stereo f32 and pushed into the audio
+//!   `craft-audio` Opus to interleaved stereo f32 and pushed into the audio
 //!   sink.
 //!
 //! Session lifetime: one phone at a time, on one process-wide signaling
@@ -58,8 +58,8 @@ use rustls::pki_types::PrivateKeyDer;
 use rustls::{ServerConfig, ServerConnection, StreamOwned};
 
 use bytes::BytesMut;
-use rtc::interceptor::{Interceptor, Registry};
-use rtc::peer_connection::configuration::interceptor_registry::{configure_nack, configure_rtcp_reports};
+use rtc::interceptor::{Interceptor, NackGeneratorBuilder, NackResponderBuilder, Registry};
+use rtc::peer_connection::configuration::interceptor_registry::configure_rtcp_reports;
 use rtc::peer_connection::configuration::media_engine::{
     MediaEngine, MIME_TYPE_H264, MIME_TYPE_OPUS, MIME_TYPE_RTX,
 };
@@ -74,12 +74,14 @@ use rtc::peer_connection::RTCPeerConnectionBuilder;
 use rtc::rtcp::payload_feedbacks::picture_loss_indication::PictureLossIndication;
 use rtc::rtcp::payload_feedbacks::receiver_estimated_maximum_bitrate::ReceiverEstimatedMaximumBitrate;
 use rtc::rtp::packet::Packet as RtpPacket;
-use rtc::rtp_transceiver::rtp_sender::{RTCRtpCodec, RTCRtpCodecParameters, RtpCodecKind};
+use rtc::rtp_transceiver::rtp_sender::{
+    RTCPFeedback, RTCRtpCodec, RTCRtpCodecParameters, RtpCodecKind, TYPE_RTCP_FB_NACK,
+};
 use rtc::rtp_transceiver::RTCRtpReceiverId;
 use rtc::sansio::Protocol;
 use rtc::shared::{TaggedBytesMut, TransportContext, TransportProtocol};
 
-use crate::h264_depacketizer::{DepackOutcome, H264Depacketizer};
+use crate::h264_depacketizer::{DepackDropReason, DepackOutcome, H264Depacketizer};
 use crate::phone_decode::{PhoneDecoder, create_decoder};
 use crate::{AudioSink, VideoSink};
 
@@ -656,8 +658,9 @@ fn run_session(
 ///
 /// * H.264 baseline (42e01f, what desktop Chrome sends) + high (640c1f, some
 ///   Androids) + their RTX, Opus.
-/// * `configure_nack` (loss repair) + `configure_rtcp_reports` (SR/RR) +
-///   `RembFeedbackInterceptor` (per-sender REMB bandwidth feedback).
+/// * NACK (loss repair, capped re-requests — see the comment in the body) +
+///   `configure_rtcp_reports` (SR/RR) + REMB bandwidth feedback injected in
+///   the media loop (per-sender, not an interceptor — see below).
 ///
 /// Why REMB and not TWCC: the SDP deliberately negotiates no transport-cc,
 /// so Chrome's bandwidth estimator relies on REMB. A sender whose estimator
@@ -757,7 +760,29 @@ fn build_peer(host_ip: &str, udp_port: u16) -> Result<RTCPeerConnection<impl Int
     // 与 RTP 包携带的 offer pt 对不上),interceptor 拿不到远端 SSRC。
     // 改为在媒体循环里直接通过 `receiver.write_rtcp` 注入 REMB(见
     // `SessionCtx::maybe_send_remb`),与 PLI 同一条路径。
-    let registry = configure_nack(Registry::new(), &mut media_engine);
+    //
+    // NACK 不用 `configure_nack`(无限重请求)有两个刻意的偏差:
+    // * NackGenerator 只认线上原流的序列号,而重传走 RTX 流(独立 SSRC/
+    //   序列号),endpoint 在 interceptor 之后才解包回原流 —— 生成器永远
+    //   看不到"缺口已补",同一个丢包会被每周期重发 NACK,Chrome 每次都
+    //   重传,实测一个丢包引出 55 次重传、6 秒连环掉帧(2026-11-11 日志)。
+    //   max_nacks_per_packet=3 给每次重传请求封顶。
+    // * 默认 100ms 的周期太慢,250ms 的重排窗口内只剩一次机会;50ms 让
+    //   窗口内有 3~4 次尝试,重传普遍能在窗口内落地、整帧救回。
+    for parameter in ["", "pli"] {
+        media_engine.register_feedback(
+            RTCPFeedback { typ: TYPE_RTCP_FB_NACK.to_owned(), parameter: parameter.to_owned() },
+            RtpCodecKind::Video,
+        );
+    }
+    let registry = Registry::new()
+        .with(
+            NackGeneratorBuilder::new()
+                .with_interval(Duration::from_millis(50))
+                .with_max_nacks_per_packet(3)
+                .build(),
+        )
+        .with(NackResponderBuilder::new().build());
     let registry = configure_rtcp_reports(registry);
 
     let mut pc = RTCPeerConnectionBuilder::new()
@@ -950,17 +975,9 @@ fn run_negotiation(
         // interceptor 的 bind —— 见 build_peer 注释)。
         ctx.maybe_send_remb(&mut pc);
 
-        // 每 5s 帧率统计：确认 phone 解码投递速率（发送侧已确认 30fps——
-        // 若这里低于 30，掉帧在接收链路而非发送侧）。
-        if ctx.stats_last.elapsed() >= Duration::from_secs(5) {
-            let el = ctx.stats_last.elapsed().as_secs_f64();
-            log::info!(
-                "phone decode: {:.1} fps AU (5s window)",
-                ctx.stats_au as f64 / el
-            );
-            ctx.stats_au = 0;
-            ctx.stats_last = Instant::now();
-        }
+        // IDR 门状态机:门关闭期间每 500ms 重发 PLI(修复"最终永久卡死"),
+        // 开/关沿各记一条日志(见 poll_gate)。
+        ctx.poll_gate(&mut pc);
 
         // When the sans-I/O core schedules internal work (ICE timeouts,
         // RTCP scheduling), sleep only until then.
@@ -1006,6 +1023,31 @@ fn run_negotiation(
 // Per-connection media state: depacketize → decode → mailbox / ring
 // ---------------------------------------------------------------------------
 
+/// IDR 关键帧恢复门的状态(见 `poll_gate`):门从开变关的那一次记原因与
+/// 时刻——一次卡顿一条日志,重复触发不重记;门打开沿报恢复时长。
+#[derive(Default)]
+struct GateState {
+    /// IDR 门:None=开;Some=关闭时刻。
+    since: Option<Instant>,
+    reason: &'static str,
+    /// 本次关闭期间发出的 PLI 数(恢复日志里给出)。
+    plis: u32,
+    /// "超过 3s 未恢复"的强调告警只放行一次/每次关闭。
+    warned: bool,
+}
+
+/// 丢帧原因 → 事件日志里的完整表述(IDR 门关闭沿沿用)。
+fn drop_reason_text(reason: DepackDropReason) -> &'static str {
+    match reason {
+        DepackDropReason::SeqGap => {
+            "frame dropped: packets missing (loss unrecovered within the reorder window)"
+        }
+        DepackDropReason::FuInterrupted => "frame dropped: FU-A run cut (end fragment lost)",
+        DepackDropReason::MissingFuStart => "frame dropped: FU-A start fragment lost",
+        DepackDropReason::Malformed => "frame dropped: malformed payload",
+    }
+}
+
 struct SessionCtx {
     h264_pt: Option<u8>,
     opus_pt: Option<u8>,
@@ -1035,9 +1077,8 @@ struct SessionCtx {
     remb_window_start: Instant,
     remb_window_bytes: u64,
     remb_measured_bps: f32,
-    // —— 每 5s 帧率统计（诊断：phone 到达/解码投递速率）——
-    stats_last: Instant,
-    stats_au: u64,
+    /// IDR 关键帧恢复门(见 `GateState` 与 `poll_gate`)。
+    gate: GateState,
 }
 
 impl SessionCtx {
@@ -1058,8 +1099,7 @@ impl SessionCtx {
             remb_window_start: Instant::now(),
             remb_window_bytes: 0,
             remb_measured_bps: 0.0,
-            stats_last: Instant::now(),
-            stats_au: 0,
+            gate: GateState::default(),
         }
     }
 
@@ -1119,17 +1159,20 @@ impl SessionCtx {
     /// Ask the phone for a fresh keyframe. After a dropped or undecodable
     /// frame every subsequent P-frame decodes to garbage and the picture
     /// freezes on the last good frame — a Picture Loss Indication gets the
-    /// encoder to send an IDR. Throttled so a loss burst costs one PLI.
-    fn request_keyframe<I: Interceptor>(&mut self, pc: &mut RTCPeerConnection<I>) {
+    /// encoder to send an IDR. Throttled to one PLI per 500ms (a loss burst
+    /// costs a steady drip of requests, never a storm); returns whether a
+    /// PLI actually went out.
+    fn request_keyframe<I: Interceptor>(&mut self, pc: &mut RTCPeerConnection<I>) -> bool {
         if self.last_pli.elapsed() < Duration::from_millis(500) {
-            return;
+            return false;
         }
+        let Some((receiver_id, media_ssrc)) = self.pli else { return false };
+        let Some(mut receiver) = pc.rtp_receiver(receiver_id) else { return false };
         self.last_pli = Instant::now();
-        let Some((receiver_id, media_ssrc)) = self.pli else { return };
-        let Some(mut receiver) = pc.rtp_receiver(receiver_id) else { return };
         let pli = PictureLossIndication { sender_ssrc: 0, media_ssrc };
         if let Err(e) = receiver.write_rtcp(vec![Box::new(pli)]) {
             log::warn!("phone h264 decode: PLI send failed: {e}");
+            false
         } else {
             // Diagnostic: the recovery path — the phone's encoder should
             // answer with an IDR. If this never appears while frames are
@@ -1139,10 +1182,12 @@ impl SessionCtx {
             if !SENT.swap(true, std::sync::atomic::Ordering::Relaxed) {
                 log::info!("phone h264: PLI sent (media_ssrc={media_ssrc}) — waiting for a keyframe");
             }
+            true
         }
     }
 
     fn handle_rtp<I: Interceptor>(&mut self, pc: &mut RTCPeerConnection<I>, packet: &RtpPacket) {
+        let now = Instant::now();
         let pt = packet.header.payload_type;
         // Diagnostic: RTP arrives before the negotiated payload types are
         // known (OnTrack needs the first packet — one round-trip of
@@ -1158,7 +1203,7 @@ impl SessionCtx {
             // 接收速率测量:250ms 窗口累计视频 RTP payload 字节,与当前值
             // 做轻量平滑(新值 30% 权重),供 `maybe_send_remb` 折算带宽。
             self.remb_window_bytes += packet.payload.len() as u64;
-            let elapsed = Instant::now().duration_since(self.remb_window_start);
+            let elapsed = now.duration_since(self.remb_window_start);
             if elapsed >= Duration::from_millis(250) {
                 let rate = self.remb_window_bytes as f32 * 8.0 / elapsed.as_secs_f32();
                 self.remb_measured_bps = if self.remb_measured_bps > 0.0 {
@@ -1166,7 +1211,7 @@ impl SessionCtx {
                 } else {
                     rate
                 };
-                self.remb_window_start = Instant::now();
+                self.remb_window_start = now;
                 self.remb_window_bytes = 0;
             }
             // FFmpeg 硬件解码失败（receive / transfer 错误）不会让 push
@@ -1184,58 +1229,16 @@ impl SessionCtx {
                     // 的，配合上面的 keyframe 请求在下一个 IDR 恢复画面。
                     decoder.reset();
                 }
+                self.note_gate_trigger("hw decode failed");
                 self.request_keyframe(pc);
             }
-            match self.depack.push(&packet.payload, packet.header.marker, packet.header.sequence_number) {
-                // One complete Annex-B access unit: decode it.
-                DepackOutcome::Frame(au) => {
-                    if let Some(decoder) = &mut self.decoder
-                        && let Err(e) = decoder.push(&au, packet.header.timestamp)
-                    {
-                        // Bad bitstream (e.g. lost NALs): the decoder is
-                        // stuck until a keyframe arrives. 立即重置并挂上
-                        // IDR 门——继续喂只会一帧一个错误（参考链断了的
-                        // P 帧解不出 gap），每次都是一次注定失败的解码、
-                        // 一条日志、一次 keyframe 请求。重置后只等 IDR，
-                        // 日志一条，CPU 一拍都不浪费。
-                        log::warn!("phone h264 decode: {e} — resetting, waiting for keyframe");
-                        decoder.reset();
-                        self.request_keyframe(pc);
-                    } else {
-                        // 解码投递速率统计：完整 AU 成功进解码器（h264_pt
-                        // 与 decoder 在 OnTrack 同批建立，此处 decoder 必在）。
-                        self.stats_au += 1;
-                    }
-                }
-                // Corrupt frame (packet loss): dropped at the marker. The
-                // decoder still has the *previous* frame's reference, so
-                // only a keyframe can recover.
-                DepackOutcome::Dropped => {
-                    // Diagnostic: loss events are rare on a LAN. Reported at
-                    // most once per five seconds — a second line means the
-                    // link is *still* dropping packets, and each dropped
-                    // frame costs a keyframe round-trip (a visible stutter
-                    // while the picture waits for the IDR).
-                    static LAST_REPORTED: std::sync::atomic::AtomicU64 =
-                        std::sync::atomic::AtomicU64::new(0);
-                    let now_ms = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.as_millis() as u64)
-                        .unwrap_or(0);
-                    let last = LAST_REPORTED.load(std::sync::atomic::Ordering::Relaxed);
-                    if now_ms.saturating_sub(last) > 5_000 {
-                        LAST_REPORTED.store(now_ms, std::sync::atomic::Ordering::Relaxed);
-                        log::warn!("phone rtp: dropped a corrupt/out-of-order frame (packet loss?) — requesting keyframe");
-                    }
-                    // The loss broke the reference chain: skip P-frames
-                    // until the recovery keyframe so the picture freezes
-                    // briefly instead of decoding to artifacts.
-                    if let Some(decoder) = &mut self.decoder {
-                        decoder.skip_until_idr();
-                    }
-                    self.request_keyframe(pc);
-                }
-                DepackOutcome::None => {}
+            let outcome =
+                self.depack.push(&packet.payload, packet.header.marker, packet.header.sequence_number, now);
+            self.handle_depack(outcome, pc, packet.header.timestamp);
+            // A resolve can replay several buffered markers at once; surface
+            // every completed frame, not just the first.
+            while let Some(outcome) = self.depack.take_outcome() {
+                self.handle_depack(outcome, pc, packet.header.timestamp);
             }
         } else if self.opus_pt == Some(pt)
             && let Some(decoder) = &mut self.opus
@@ -1244,6 +1247,100 @@ impl SessionCtx {
                 Ok(n) if n > 0 => self.audio.push(&self.opus_buf[..n * 2]),
                 _ => {}
             }
+        }
+    }
+
+    /// One depacketizer outcome → the decoder / the loss-recovery path.
+    /// Shared by the pushed outcome and the resolve-replay drain (see
+    /// `handle_rtp`); `pts` is the carrying RTP packet's timestamp. A queued
+    /// replayed frame (a hold spanning several markers) gets the resolver's
+    /// pts — off by the inter-frame delta, and harmless: the phone sink never
+    /// reads the picture's pts (see `decoders::emit`).
+    fn handle_depack<I: Interceptor>(
+        &mut self,
+        outcome: DepackOutcome,
+        pc: &mut RTCPeerConnection<I>,
+        pts: u32,
+    ) {
+        match outcome {
+            // One complete Annex-B access unit: decode it.
+            DepackOutcome::Frame(au) => {
+                if let Some(decoder) = &mut self.decoder
+                    && let Err(e) = decoder.push(&au, pts)
+                {
+                    // Bad bitstream (e.g. lost NALs): the decoder is
+                    // stuck until a keyframe arrives. 立即重置并挂上
+                    // IDR 门——继续喂只会一帧一个错误（参考链断了的
+                    // P 帧解不出 gap），每次都是一次注定失败的解码、
+                    // 一条日志、一次 keyframe 请求。重置后只等 IDR，
+                    // 日志一条，CPU 一拍都不浪费。
+                    log::warn!("phone h264 decode: {e} — resetting, waiting for keyframe");
+                    decoder.reset();
+                    self.note_gate_trigger("decode error");
+                    self.request_keyframe(pc);
+                }
+            }
+            // Corrupt frame: dropped at the marker (unrecovered gap, or a
+            // structural break). The decoder still has the *previous* frame's
+            // reference, so only a keyframe can recover. 告警在门关闭沿发
+            // 一次(见 note_gate_trigger)——一次卡顿一条,不刷屏。
+            DepackOutcome::Dropped(reason) => {
+                // The loss broke the reference chain: skip P-frames
+                // until the recovery keyframe so the picture freezes
+                // briefly instead of decoding to artifacts.
+                if let Some(decoder) = &mut self.decoder {
+                    decoder.skip_until_idr();
+                }
+                self.note_gate_trigger(drop_reason_text(reason));
+                self.request_keyframe(pc);
+            }
+            DepackOutcome::None => {}
+        }
+    }
+
+    /// IDR 门关闭沿:仅在门从开变关的那一次告警(一次卡顿一条,不是每帧
+    /// 一条);重复触发(丢帧后又解码失败)不重记。
+    fn note_gate_trigger(&mut self, reason: &'static str) {
+        if self.gate.since.is_none() {
+            self.gate.since = Some(Instant::now());
+            self.gate.reason = reason;
+            self.gate.plis = 0;
+            self.gate.warned = false;
+            log::warn!("phone h264: keyframe gate closed — {reason}; requesting keyframe");
+        }
+    }
+
+    /// IDR 门状态机(每次事件循环调用):门关闭期间每 500ms 重发一次 PLI
+    /// ——这是"最终永久卡死"的修复。此前 PLI 只在丢帧/解码错误事件上
+    /// 触发:一旦恢复关键帧被同一轮突发整个吞掉(整帧丢包在重排窗口外
+    /// 不可救)或 PLI 的 RTCP 包本身丢了,事件不再发生、PLI 永远停发、
+    /// 门再也没人开,RTP 却还在流——画面永久冻结而会话不报错。门打开
+    /// 沿记一条恢复日志(时长 = 本次卡顿实测长度)。
+    fn poll_gate<I: Interceptor>(&mut self, pc: &mut RTCPeerConnection<I>) {
+        let waiting = self.decoder.as_ref().is_some_and(|d| d.waiting_keyframe());
+        match self.gate.since {
+            Some(since) if waiting => {
+                if self.request_keyframe(pc) {
+                    self.gate.plis += 1;
+                }
+                if !self.gate.warned && since.elapsed() > Duration::from_secs(3) {
+                    self.gate.warned = true;
+                    log::warn!(
+                        "phone h264: no keyframe for >3s ({}) — PLIs re-sent every 500ms; if this persists the phone is not answering PLIs",
+                        self.gate.reason
+                    );
+                }
+            }
+            Some(_) => {
+                let since = self.gate.since.take().unwrap_or_else(Instant::now);
+                log::info!(
+                    "phone h264: keyframe recovered after {:.2}s ({} PLI sent; {})",
+                    since.elapsed().as_secs_f32(),
+                    self.gate.plis,
+                    self.gate.reason
+                );
+            }
+            None => {}
         }
     }
 }

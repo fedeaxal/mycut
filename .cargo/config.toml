@@ -8,3 +8,16 @@ xtask = "run --quiet --package xtask --"
 # passes through untouched.
 [target.'cfg(target_os = "macos")']
 runner = "packaging/macos/run-app.sh"
+
+# Windows used to link the C runtime statically (+crt-static): the ASR
+# worker's sherpa-onnx was a prebuilt static library compiled with /MT, and a
+# dynamic-CRT (/MD) host failed to link it (LNK2038, "RuntimeLibrary
+# mismatch"). sherpa-onnx now links through its self-contained DLL
+# (`sherpa-onnx/shared` — its DLLs carry their own CRT, host CRT is
+# irrelevant, and its bundled onnxruntime.dll is 1.24.4), which frees the
+# host to be /MD — required by the face pipeline's ort official prebuilt
+# (pyke's statically-linked ONNX Runtime is /MD-built; a /MT host fails its
+# link with a wall of __imp_* LNK2019s). The packages ship the VC++ runtime
+# DLLs for the now-dynamic CRT (packaging/windows/package.ps1 stages them
+# unconditionally). MSVC only: the gnu toolchain links its CRT statically
+# already.

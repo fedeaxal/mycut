@@ -22,20 +22,39 @@ rayon = "1.10.0"
 # 仅在通过 `--tracy` 启动采集时才有开销，平时为空操作，保留原工程的性能分析能力
 tracy-client = "0.18.0"
 
-# ONNX Runtime 按目标平台开执行提供者（load-dynamic：运行时加载 onnxruntime
-# 动态库，模型与 EP 在 utils::Ep 里再按平台选择；版本与 media 的 ort 统一，
-# workspace 内只编译一份）。ndarray feature 供输入张量走 ndarray 视图（ort 侧
-# 也是 0.17，与本项目统一）；关掉 default 的 download-binaries/copy-dylibs——
-# load-dynamic 下不需要构建期拉二进制。
-# - macOS Apple Silicon：CoreML
-# - Windows：DirectML
-# - 其余（Intel macOS / Linux）：纯 CPU——Intel 核显上 CoreML 实测反而更慢，
-#   Windows 的 DirectML 已单列。
+# ONNX Runtime 按目标平台取用与开执行提供者；模型与 EP 在 utils::Ep 里再按
+# 平台选择。ndarray feature 供输入张量走 ndarray 视图（ort 侧也是 0.17，与
+# 本项目统一）。
+#
+# Apple Silicon：ort 官方预编译（`download-binaries`，ort 的默认行为）——
+# ort-sys 构建期从 pyke CDN 下载与本版 ort 配对构建的静态库链进程序
+# （ms@1.28.0 的 coreml flavor），不再随包分发 libonnxruntime.dylib。
+# `tls-native` 是 download-binaries 的硬性要求（构建脚本的 CDN 下载要有 TLS
+# provider）。静态化后 ORT 的图优化级别也不要显式设（见
+# utils::session_builder）。
+#
+# Windows：同样 ort 官方预编译（directml flavor，DirectML EP 内置）。
+# 这要求宿主动态 CRT（pyke 的静态库是 /MD 构建，/MT 宿主链接必败），
+# 而 /MD 的解锁靠 ASR 侧的 sherpa-onnx 换成自包含 DLL（`asr` crate 的
+# Windows 目标用 sherpa `shared`，见 crates/asr/Cargo.toml 与
+# .cargo/config.toml 的说明）。`copy-dylibs` 会把 pyke 附带的
+# DirectML.dll 1.15.4 复制到产物目录随包发布；exe 旁的 onnxruntime.dll
+# 是 sherpa 包带的 1.24.4（只有 ASR DLL 用它——人脸线是静态的，不加载
+# 任何 onnxruntime.dll）。
+#
+# 其余目标（Intel macOS / Linux）：官方没有 Intel mac 的预编译，走
+# load-dynamic（CI 的 x86_64 mac 包携带 1.23.0 dylib：微软给 osx-x86_64
+# 发布的最后一版；ort 未开任何 api-* feature 时请求 C API 17，1.17 起的
+# 运行时都能应答）。这两个目标 Auto 恒 CPU。
+# 注意：代码里 init_from 的调用点按同一目标划分 cfg——若调整这里的目标
+# 归属，需同步 facelandmark-cli 与 reaction::face::detect。
 [target.'cfg(all(target_os = "macos", target_arch = "aarch64"))'.dependencies]
 ort = { version = "2.0.0-rc.13", default-features = false, features = [
     "std",
     "ndarray",
-    "load-dynamic",
+    "download-binaries",
+    "tls-native",
+    "copy-dylibs",
     "coreml",
 ] }
 
@@ -43,7 +62,9 @@ ort = { version = "2.0.0-rc.13", default-features = false, features = [
 ort = { version = "2.0.0-rc.13", default-features = false, features = [
     "std",
     "ndarray",
-    "load-dynamic",
+    "download-binaries",
+    "tls-native",
+    "copy-dylibs",
     "directml",
 ] }
 

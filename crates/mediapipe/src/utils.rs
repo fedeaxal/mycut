@@ -6,7 +6,6 @@ use image::{ImageBuffer, Rgb};
 use ndarray::ArrayView3;
 use ort::execution_providers::ExecutionProviderDispatch;
 use ort::session::Session;
-use ort::session::builder::GraphOptimizationLevel;
 
 use crate::geometry::Rect;
 
@@ -102,10 +101,18 @@ pub fn letterbox_params(
     )
 }
 
-/// 执行提供者选择。Auto 按平台自动：Windows 优先 DirectML、Apple Silicon 用
+/// 执行提供者选择。Auto 按平台自动：Windows 用 DirectML、Apple Silicon 用
 /// CoreML、其余平台（Intel macOS/Linux）用 CPU。
 /// 注：macOS 上 CoreML 在 Intel 核显机器实测远慢于 CPU（模型搬运开销 > 收益），
-/// Intel 目标的 ort 也不编译 coreml feature。
+/// Intel 目标的 ort 也不编译 coreml feature。Windows 请求 DirectML 的前提是
+/// 随包的 onnxruntime.dll 是 DirectML 版（CI 打包微软 DirectML NuGet 的
+/// 1.24.4——官方 DirectML 版 DLL 的最后一版；Apple Silicon 则是 ort 官方
+/// 预编译静态链接，CoreML EP 内置）。对 **CPU 版**运行时（如手放的微软
+/// GitHub release zip）请求 DirectML 不是优雅回退而是 0xC0000005 崩溃：
+/// 里面没有 DML EP，`GetExecutionProviderApi("DML")` 交回垃圾表指针，ort
+/// rc.13 拿它直接调 `SessionOptionsAppendExecutionProvider_DML2`（2026-11-11
+/// 排查的「进 Reaction 界面就崩」）。无 DX12/CoreML 设备时注册失败仍会
+/// 优雅回退 CPU。
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Ep {
     Auto,
@@ -129,8 +136,9 @@ impl Ep {
 /// 按平台/用户选择构建执行提供者列表（按优先级排序，末位恒为 CPU 回退）。
 ///
 /// CoreML/DirectML 各自只在编译进 ort 对应 feature 的目标上可用（见
-/// Cargo.toml 的按目标依赖表）：请求了本平台没有的 EP 时静默回退 CPU，
-/// `load-dynamic` 下运行时库也未必带该 EP，让 ORT 自己再退一次。
+/// Cargo.toml 的按目标依赖表）。Windows 请求 DirectML 要求随包运行时是
+/// DirectML 版（CI 打包微软 DirectML NuGet 1.24.4）——CPU 版运行时会崩，
+/// 不是优雅回退（见 [`Ep`] 的文档）。
 fn execution_providers(ep: Ep) -> Vec<ExecutionProviderDispatch> {
     use ort::ep::*;
     let mut list: Vec<ExecutionProviderDispatch> = Vec::with_capacity(2);
@@ -138,6 +146,9 @@ fn execution_providers(ep: Ep) -> Vec<ExecutionProviderDispatch> {
         Ep::Auto => {
             #[cfg(target_os = "windows")]
             {
+                // CI 随包的 onnxruntime.dll 是 DirectML 版(1.24.4);无 DX12
+                // 设备时注册失败会优雅回退 CPU。CPU 版 DLL 不可这么请求,
+                // 见 [`Ep`] 文档。
                 Ep::DirectML
             }
             #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
@@ -190,34 +201,56 @@ pub fn build_session<P: AsRef<Path>>(model: P, ep: Ep, intra_threads: usize) -> 
             return build_session_from_memory(bytes, ep, intra_threads);
         }
     }
-    let session = session_builder(ep, intra_threads)?
-        .commit_from_file(model)
-        .map_err(|e| anyhow::anyhow!("[ort] commit: {e}"))?;
-    Ok(session)
+    commit_session(ep, intra_threads, |builder| builder.commit_from_file(path))
 }
 
 /// 从内存中的模型字节构建推理会话（onnx 格式由 ORT 内部复制解析，
 /// 字节缓冲无需在会话存活期间保持有效）。
 pub fn build_session_from_memory(model_bytes: &[u8], ep: Ep, intra_threads: usize) -> anyhow::Result<Session> {
-    let session = session_builder(ep, intra_threads)?
-        .commit_from_memory(model_bytes)
-        .map_err(|e| anyhow::anyhow!("[ort] commit: {e}"))?;
-    Ok(session)
+    commit_session(ep, intra_threads, |builder| builder.commit_from_memory(model_bytes))
 }
 
-/// 配置执行提供者与线程/优化等级的公共 builder 链，文件/内存两种加载
-/// 路径共用（rc.13 的 builder 方法返回 Error<SessionBuilder>，为可 recover
-/// 携带构建器自身，NonNull 使其 !Send/!Sync，不能 `?` 直转 anyhow，统一
-/// map_err 成 owned 消息）。
+/// 提交会话，Windows 的 `Ep::Auto` 带 GPU 优先/CPU 兜底：先按 DirectML 建
+/// 会话，创建失败（无 DX12 设备/驱动不可用）时丢弃该构建器、换纯 CPU 重建
+/// ——保证「有显卡用显卡，没显卡用 CPU」。
+/// 兜底只认 `Ep::Auto`：显式 `Ep::DirectML` 的失败照常报错（用户点名要它，
+/// 静默改 CPU 会掩盖配置问题）。
+fn commit_session(
+    ep: Ep,
+    intra_threads: usize,
+    commit: impl Fn(&mut ort::session::builder::SessionBuilder) -> Result<Session, ort::Error>,
+) -> anyhow::Result<Session> {
+    let attempt = |ep: Ep| -> Result<Session, anyhow::Error> {
+        let mut builder = session_builder(ep, intra_threads)?;
+        commit(&mut builder).map_err(|e| anyhow::anyhow!("[ort] commit: {e}"))
+    };
+    match attempt(ep) {
+        Ok(session) => Ok(session),
+        Err(error) if ep == Ep::Auto && cfg!(target_os = "windows") => {
+            eprintln!("face: DirectML 不可用（{error}），改用 CPU 推理");
+            attempt(Ep::Cpu)
+        }
+        Err(error) => Err(error),
+    }
+}
+
+/// 配置执行提供者与线程数的公共 builder 链，文件/内存两种加载路径共用
+/// （rc.13 的 builder 方法返回 Error<SessionBuilder>，为可 recover 携带构建
+/// 器自身，NonNull 使其 !Send/!Sync，不能 `?` 直转 anyhow，统一 map_err 成
+/// owned 消息）。
+///
+/// 图优化不再显式设级：ORT 的默认就是全开（`ORT_ENABLE_ALL=99`），效果一致；
+/// 之前显式传的 `Level3` 经 rc.13 映射成 `ORT_ENABLE_LAYOUT=3`——那是比
+/// onnxruntime 1.28 更新的枚举值，1.28 对 3 直接报
+/// `graph_optimization_level is not valid`，三个模型全会加载失败（人脸线
+/// 整线降级）。
 fn session_builder(ep: Ep, intra_threads: usize) -> anyhow::Result<ort::session::builder::SessionBuilder> {
     Ok(Session::builder()
         .map_err(|e| anyhow::anyhow!("[ort] builder: {e}"))?
         .with_execution_providers(execution_providers(ep))
         .map_err(|e| anyhow::anyhow!("[ort] execution providers: {e}"))?
         .with_intra_threads(intra_threads)
-        .map_err(|e| anyhow::anyhow!("[ort] intra threads: {e}"))?
-        .with_optimization_level(GraphOptimizationLevel::Level3)
-        .map_err(|e| anyhow::anyhow!("[ort] optimization level: {e}"))?)
+        .map_err(|e| anyhow::anyhow!("[ort] intra threads: {e}"))?)
 }
 
 /// 模型输入/输出张量的维度（ort rc.13：Outlet → dtype().tensor_shape()）。

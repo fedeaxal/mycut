@@ -195,7 +195,7 @@ mod native {
             config.model_config.provider = Some("cpu".into());
             config.model_config.debug = false;
             // 热词只在 modified_beam_search 下生效（greedy 时 sherpa 忽略）；
-            // 无热词的会话保持 greedy_search，识别速度与旧行为一致
+            // 未指定解码法时缺省 greedy_search
             config.decoding_method = Some(
                 options
                     .decoding_method
@@ -294,6 +294,14 @@ mod native {
         /// 送入一个固定长度窗口（window_size 样本）。
         pub fn accept_waveform(&self, window: &[f32]) {
             self.inner.accept_waveform(window);
+        }
+
+        /// 是否有「开口未收」的语音段：sherpa 只在等到一个全非语音的
+        /// 窗口时才收段，持续有声（对白叠配乐）会让段一直开着——调用方
+        /// 据此给超长开口段强制 [`Self::flush`]，实时 cue 才不至于被憋
+        /// 到会话结束。
+        pub fn detected(&self) -> bool {
+            self.inner.detected()
         }
 
         pub fn is_empty(&self) -> bool {

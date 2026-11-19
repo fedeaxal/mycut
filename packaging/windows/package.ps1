@@ -7,9 +7,9 @@
     filmcraft-<version>-windows-<arch>.msi            per-machine installer (WiX v5)
     filmcraft-<version>-windows-<arch>-portable.zip   filmcraft.exe + filmcraft-cli.exe + portable.txt
 
-  The binaries link the C runtime statically (+crt-static), so neither the MSI nor the portable
-  zip needs the Visual C++ redistributable. Signing is delegated to sign.ps1 (skipped with a
-  warning when no signing secrets are set).
+  The binaries are /MD (dynamic CRT): the staged VC++ runtime DLLs are required and included, so
+  the MSI and portable zip are still self-contained. Signing is delegated to sign.ps1 (skipped
+  with a warning when no signing secrets are set).
 
   Needs: Rust (MSVC toolchain + the target), the Windows SDK (rc.exe, signtool.exe),
   and WiX v5: dotnet tool install --global wix --version 5.0.2
@@ -56,13 +56,14 @@ if (-not $env:FILMCRAFT_BUILD_DATE) { $env:FILMCRAFT_BUILD_DATE = (Get-Date).ToU
 Write-Output "FilmCraft $Version for Windows $Arch ($Target)"
 
 if (-not $SkipBuild) {
-  # Static CRT: no VC++ redistributable needed. Scoped to the target so host build scripts and
-  # proc-macros are unaffected.
-  $flagVar = 'CARGO_TARGET_' + ($Target.ToUpper() -replace '-', '_') + '_RUSTFLAGS'
-  [Environment]::SetEnvironmentVariable($flagVar, '-C target-feature=+crt-static')
+  # The build is /MD (dynamic CRT): the face pipeline's ort official prebuilt is /MD-built and the
+  # ASR worker's sherpa-onnx ships as a self-contained DLL, so no static-CRT constraint remains —
+  # see .cargo/config.toml. The VC++ runtime DLLs are staged unconditionally below. Pass the
+  # sherpa-onnx tar through to the build scripts (SHERPA_ONNX_ARCHIVE_DIR, set by CI).
   # Fail the build (rather than warn) if the icon/VERSIONINFO can't be embedded.
   $env:FILMCRAFT_REQUIRE_WINRES = '1'
-  Invoke-Native "cargo build ($Target)" { cargo build --release --locked -p filmcraft -p filmcraft-cli --target $Target }
+  # Official packages include Kokoro natural voices (downloaded on first use). #2318 #3773
+  Invoke-Native "cargo build ($Target)" { cargo build --release --locked -p filmcraft -p filmcraft-cli --features filmcraft/neural-voices --target $Target }
 }
 
 $Bin = Join-Path $TargetDir "$Target\release"
@@ -93,12 +94,13 @@ Copy-Item (Join-Path $Bin 'filmcraft.exe'), (Join-Path $Bin 'filmcraft-cli.exe')
 & (Join-Path $PSScriptRoot 'sign.ps1') (Join-Path $Stage 'filmcraft.exe') (Join-Path $Stage 'filmcraft-cli.exe')
 
 # ---- runtime libraries the executables load at run time ----------------------------------------
-# FFmpeg and the face pipeline's ONNX Runtime link dynamically and are found beside the
-# executable; the FFmpeg DLLs use the dynamic CRT, so the redistributable's DLLs ride along (the
-# executables themselves are /MT). Both are optional CI inputs: without FFMPEG_DIR /
-# ONNXRUNTIME_DIR the build is expected to have resolved them another way (statically), and the
-# installers carry only the executables.
-$HasRuntimeLibs = 0
+# FFmpeg links dynamically and is found beside the executable (FFMPEG_DIR is an optional CI input:
+# without it the installers carry only the executables). The face pipeline's ONNX Runtime is ort's
+# official prebuilt, statically linked into the executables — no onnxruntime.dll for it. The DLLs
+# that do ship come from the build tree the steps above populated: sherpa-onnx-c-api.dll (the ASR
+# worker, built by CI from the fork — with its bundled onnxruntime.dll 1.24.4 for itself) and
+# DirectML.dll (pyke's copy-dylibs drops it beside the binaries for the statically linked DML EP).
+# The executables are /MD, so the VC++ redistributable's DLLs always ride along.
 $Lic = Join-Path $Stage 'licences'
 if ($env:FFMPEG_DIR) {
   Copy-Item (Join-Path $env:FFMPEG_DIR 'bin\*.dll') $Stage
@@ -108,29 +110,25 @@ if ($env:FFMPEG_DIR) {
   New-Item -ItemType Directory -Force -Path $Lic | Out-Null
   Get-ChildItem (Join-Path $env:FFMPEG_DIR 'share') -Filter copyright -Recurse |
     ForEach-Object { Copy-Item $_.FullName (Join-Path $Lic "$($_.Directory.Name).txt") }
-  $HasRuntimeLibs = 1
 }
-if ($env:ONNXRUNTIME_DIR) {
-  Copy-Item (Join-Path $env:ONNXRUNTIME_DIR '*.dll') $Stage
-  if (-not (Test-Path (Join-Path $Stage 'onnxruntime.dll'))) {
-    throw 'ONNXRUNTIME_DIR carried no onnxruntime.dll'
-  }
-  New-Item -ItemType Directory -Force -Path $Lic | Out-Null
-  Copy-Item (Join-Path $env:ONNXRUNTIME_DIR 'LICENSE') (Join-Path $Lic 'onnxruntime-LICENSE.txt')
-  Copy-Item (Join-Path $env:ONNXRUNTIME_DIR 'ThirdPartyNotices.txt') (Join-Path $Lic 'onnxruntime-ThirdPartyNotices.txt')
-  $HasRuntimeLibs = 1
+foreach ($dll in @('sherpa-onnx-c-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'DirectML.dll')) {
+  $src = Join-Path $Bin $dll
+  if (-not (Test-Path $src)) { throw "build tree is missing $dll — was the build run with the ASR/face dependencies in place?" }
+  Copy-Item $src $Stage
 }
-if ($HasRuntimeLibs -eq 1) {
-  # The whole Microsoft.VC*.CRT folder rather than a list of file names: it is exactly the set
-  # Microsoft redistributes together, and picking from it by hand is how an install ends up
-  # missing vcruntime140_1.dll.
-  $crt = Get-ChildItem 'C:/Program Files/Microsoft Visual Studio/*/*/VC/Redist/MSVC/*/x64/Microsoft.VC*.CRT' -Directory |
-    Sort-Object { [version]$_.Parent.Parent.Name } |
-    Select-Object -Last 1
-  if (-not $crt) { throw 'no Visual C++ redistributable found on the runner (the FFmpeg DLLs need it)' }
-  Write-Output "CRT DLLs from $($crt.FullName)"
-  Copy-Item (Join-Path $crt.FullName '*.dll') $Stage
-}
+New-Item -ItemType Directory -Force -Path $Lic | Out-Null
+Copy-Item (Join-Path $PSScriptRoot 'OnnxRuntime-LICENSE.txt') (Join-Path $Lic 'OnnxRuntime-LICENSE.txt')
+Copy-Item (Join-Path $PSScriptRoot 'sherpa-onnx-LICENSE.txt') (Join-Path $Lic 'sherpa-onnx-LICENSE.txt')
+Copy-Item (Join-Path $PSScriptRoot 'DirectML-LICENSE.txt') (Join-Path $Lic 'DirectML-LICENSE.txt')
+# The whole Microsoft.VC*.CRT folder rather than a list of file names: it is exactly the set
+# Microsoft redistributes together, and picking from it by hand is how an install ends up
+# missing vcruntime140_1.dll. Required by the /MD executables themselves, not just the DLLs.
+$crt = Get-ChildItem 'C:/Program Files/Microsoft Visual Studio/*/*/VC/Redist/MSVC/*/x64/Microsoft.VC*.CRT' -Directory |
+  Sort-Object { [version]$_.Parent.Parent.Name } |
+  Select-Object -Last 1
+if (-not $crt) { throw 'no Visual C++ redistributable found on the runner (the /MD executables need it)' }
+Write-Output "CRT DLLs from $($crt.FullName)"
+Copy-Item (Join-Path $crt.FullName '*.dll') $Stage
 
 # ---- font notices for the MSI ------------------------------------------------------------------
 # The portable ZIP already carries these notices; stage the complete files before MSI creation too.

@@ -107,32 +107,54 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-
 
-      # The face pipeline's inference engine, which `ort` loads at run time
-      # (load-dynamic): the executable does not link it and looks for
-      # `onnxruntime.dll` beside itself — see apps/reaction's
-      # `src/face/detect.rs`. 1.28 is the version `ort` 2.0.0-rc.13 is
-      # developed against. The package Microsoft ships for it carries only
-      # the CPU execution provider compiled in, so a DirectML request falls
-      # back to CPU exactly as `facelandmark`'s provider list plans for.
+      # The face pipeline's inference engine is ort's official prebuilt,
+      # statically linked at build time (ort-sys fetches it from pyke's CDN
+      # while compiling `facelandmark`): 1.28.0, the version `ort`
+      # 2.0.0-rc.13 is developed against, with the DirectML EP compiled in —
+      # no onnxruntime.dll is needed for the face pipeline. The pyke static
+      # library is /MD-built, which is why the host build is /MD (no
+      # +crt-static — see .cargo/config.toml for how that follows from the
+      # ASR worker's sherpa-onnx switching to a self-contained DLL).
       #
-      # `tar` rather than Expand-Archive: it can leave the 400 MB .pdb out.
-      # The DLLs and licences are flattened into .onnxruntime, which is the
-      # directory the packaging script reads ONNXRUNTIME_DIR from.
-      - name: Download ONNX Runtime
+      # That DLL — sherpa-onnx-c-api.dll — does not exist as a prebuilt asset
+      # anywhere: the fork's releases carry static libraries only, and the
+      # upstream k2-fsa shared packages lack the fork's UpdateHotwords API.
+      # So we build it right here from the fork at the rev Cargo.lock pins,
+      # with the exact arguments the fork's own static-lib CI uses, minus
+      # TTS (the ASR worker never touches it) and with BUILD_SHARED_LIBS=ON /
+      # static CRT — the layout and tar name `sherpa-onnx-sys`'s build script
+      # resolves through SHERPA_ONNX_ARCHIVE_DIR. cmake downloads ORT 1.24.4
+      # itself; its onnxruntime.dll ships with the package for the DLL.
+      - name: Build the ASR worker's sherpa-onnx DLL
         shell: pwsh
+        env:
+          HOTWORD_REV: f51c0cfa7eb5c46e0bdf275120269a8ef9cb6f3d
         run: |
-          $version = "1.28.0"
-          $root = "onnxruntime-win-x64-$version"
-          curl.exe -fsSL "https://github.com/microsoft/onnxruntime/releases/download/v$version/$root.zip" -o "$env:RUNNER_TEMP\$root.zip"
-          if ($LASTEXITCODE -ne 0) { throw "onnxruntime download failed ($LASTEXITCODE)" }
-          New-Item -ItemType Directory -Force -Path .onnxruntime | Out-Null
-          tar -xf "$env:RUNNER_TEMP\$root.zip" -C .onnxruntime --exclude=*.pdb
-          if ($LASTEXITCODE -ne 0) { throw "onnxruntime extract failed ($LASTEXITCODE)" }
-          Copy-Item ".onnxruntime/$root/lib/*.dll" .onnxruntime
-          Copy-Item ".onnxruntime/$root/LICENSE", ".onnxruntime/$root/ThirdPartyNotices.txt" .onnxruntime
-          if (-not (Test-Path ".onnxruntime/onnxruntime.dll")) {
-            throw "no onnxruntime.dll in the package"
+          git clone --quiet https://github.com/letdevme/hotword.git "$env:RUNNER_TEMP\hotword"
+          git -C "$env:RUNNER_TEMP\hotword" checkout --quiet $env:HOTWORD_REV
+          cmake -S "$env:RUNNER_TEMP\hotword" -B "$env:RUNNER_TEMP\hotword\build" -A x64 `
+            -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_INSTALL_PREFIX="$env:RUNNER_TEMP\hotword\build\install" `
+            -DSHERPA_ONNX_USE_STATIC_CRT=ON -DSHERPA_ONNX_ENABLE_TTS=OFF `
+            -DSHERPA_ONNX_ENABLE_PYTHON=OFF -DSHERPA_ONNX_ENABLE_TESTS=OFF `
+            -DSHERPA_ONNX_ENABLE_BINARY=OFF -DSHERPA_ONNX_ENABLE_WEBSOCKET=OFF `
+            -DSHERPA_ONNX_ENABLE_JNI=OFF -DSHERPA_ONNX_ENABLE_PORTAUDIO=OFF
+          if ($LASTEXITCODE -ne 0) { throw "sherpa cmake failed ($LASTEXITCODE)" }
+          cmake --build "$env:RUNNER_TEMP\hotword\build" --config Release --target install --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw "sherpa build failed ($LASTEXITCODE)" }
+          New-Item -ItemType Directory -Force -Path .sherpa-shim | Out-Null
+          $stem = "sherpa-onnx-v1.13.2-win-x64-shared-MT-Release-lib"
+          $lib = "$env:RUNNER_TEMP\$stem\lib"
+          New-Item -ItemType Directory -Force -Path $lib | Out-Null
+          Copy-Item "$env:RUNNER_TEMP\hotword\build\install\lib\*" $lib
+          # cmake installs the downloaded ORT runtime DLLs under bin\; the archive
+          # sherpa-onnx-sys unpacks must carry them in lib\ beside the import libs.
+          Copy-Item "$env:RUNNER_TEMP\hotword\build\install\bin\*.dll" $lib -ErrorAction SilentlyContinue
+          if (-not (Test-Path "$lib\sherpa-onnx-c-api.dll") -or -not (Test-Path "$lib\onnxruntime.dll")) {
+            throw "sherpa DLLs missing after build (need c-api.dll and onnxruntime.dll in lib\)"
           }
+          tar -cjf ".sherpa-shim\$stem.tar.bz2" -C "$env:RUNNER_TEMP" $stem
+          if ($LASTEXITCODE -ne 0) { throw "sherpa pack failed ($LASTEXITCODE)" }
 
       # The MSI toolchain: `package.ps1` adds the UI extension itself.
       - name: Install WiX
@@ -141,14 +163,16 @@ jobs:
           dotnet tool install --global wix --version 5.0.2
           if ($LASTEXITCODE -ne 0) { throw "wix install failed ($LASTEXITCODE)" }
 
-      # Builds (static CRT, per-target — the script sets both), stages the
-      # FFmpeg / ONNX Runtime / VC++ runtime DLLs beside the executables, and
-      # produces filmcraft-<version>-windows-x64.msi and the portable zip.
-      # Signing is skipped with a warning: no certificate is configured here.
+      # Builds (/MD, per-target), stages the FFmpeg / sherpa-onnx / DirectML /
+      # VC++ runtime DLLs beside the executables, and produces
+      # filmcraft-<version>-windows-x64.msi and the portable zip. Signing is
+      # skipped with a warning: no certificate is configured here.
       - name: Package
         shell: pwsh
         env:
-          ONNXRUNTIME_DIR: ${{ github.workspace }}\.onnxruntime
+          # Where the tar `sherpa-onnx-sys`'s build script resolves (see the
+          # DLL build step above); package.ps1 passes it through to cargo.
+          SHERPA_ONNX_ARCHIVE_DIR: ${{ github.workspace }}\.sherpa-shim
         run: pwsh packaging/windows/package.ps1 -Arch x64
 
       - name: Upload the artifacts
@@ -225,17 +249,23 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-
 
-      # The face pipeline's inference engine, as on Windows: loaded at run
-      # time, looked for beside the executable (`libonnxruntime.dylib`), and
-      # its dependencies are every one system frameworks — CoreML included,
-      # which is what the arm64 EP list asks for — so the one dylib is all
-      # the bundle needs of it. It arrives ad-hoc signed and is re-signed
-      # ad hoc by the packaging script, which is what Apple silicon requires
-      # of it.
+      # The face pipeline's inference engine, as on Windows: ort's official
+      # prebuilt, statically linked at build time (CoreML EP compiled into
+      # the arm64 build — its dependencies are every one system frameworks,
+      # so nothing extra ships beside the executable). The download below is
+      # only for the x86_64 matrix leg: pyke's CDN has no Intel-mac prebuilt
+      # (ort 2.0.0-rc.13's minimum supported targets end at Intel macOS), so
+      # that leg builds with `load-dynamic` and carries Microsoft's dylib —
+      # 1.23.0, the last release Microsoft shipped an osx-x86_64 binary for.
+      # It loads because `ort`, with no api-* feature enabled anywhere in
+      # the tree, requests C API version 17, which every runtime from 1.17
+      # on answers. It arrives ad-hoc signed and is re-signed ad hoc by the
+      # packaging script, which is what Apple silicon requires of it.
       #
       # The 1.28 dylib is built for macOS 14: on 13 the face features degrade
       # the way a missing library degrades them, and nothing else notices.
       - name: Download ONNX Runtime
+        if: matrix.arch == 'x86_64'
         run: |
           set -euo pipefail
           version="${{ matrix.ort-version }}"
@@ -252,11 +282,11 @@ jobs:
           ls -l .onnxruntime
 
       # Builds (--target this matrix arch), assembles FilmCraft.app with the
-      # FFmpeg and ONNX Runtime dylibs beside the executable, checks the
-      # bundle is self-contained, signs ad hoc (no certificate here:
-      # Gatekeeper asks about a downloaded copy — docs/install.md says how to
-      # let it open) and lays it on a drag-to-Applications DMG, plus the
-      # headless CLI zip.
+      # FFmpeg dylib beside the executable (and, on Intel, the ONNX Runtime
+      # dylib the step above downloaded), checks the bundle is self-contained,
+      # signs ad hoc (no certificate here: Gatekeeper asks about a downloaded
+      # copy — docs/install.md says how to let it open) and lays it on a
+      # drag-to-Applications DMG, plus the headless CLI zip.
       - name: Package
         run: packaging/macos/package.sh --arch ${{ matrix.arch }}
         env:

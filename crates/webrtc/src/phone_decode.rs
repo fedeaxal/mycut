@@ -32,6 +32,15 @@ pub trait PhoneDecoder {
 
     /// Drop every access unit until the next keyframe (loss recovery gate).
     fn skip_until_idr(&mut self) {}
+
+    /// Whether the loss-recovery gate is closed (AUs are being dropped until
+    /// the next keyframe). The session polls this to keep re-requesting a
+    /// keyframe while recovery is pending — a PLI that never fires again
+    /// (e.g. its RTCP packet lost, or the recovery keyframe eaten whole by
+    /// the same burst) leaves the picture frozen forever.
+    fn waiting_keyframe(&self) -> bool {
+        false
+    }
 }
 
 pub fn create_decoder(

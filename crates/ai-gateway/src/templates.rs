@@ -212,7 +212,7 @@ pub fn title_user(
         ai_style
     };
     format!(
-        "这是一期观看了《{movie}》的反应视频的整集内容要点（按字幕分段整理，自动识别可能有错别字）{}。请为这期视频起一个吸睛的标题、写一段简介、并给出适合的标签。\n整集内容要点：\n{}\n{}\n\n风格要求：{style}。\n\n返回格式：{{\"title\":\"不超过 30 字的标题\",\"description\":\"两三句简介\",\"tags\":[\"标签1\",\"标签2\",\"标签3\",\"标签4\",\"标签5\"]}}",
+        "这是一期观看了《{movie}》的反应视频的整集内容要点（按字幕分段整理，自动识别可能有错别字）{}。请为这期视频起一个吸睛的标题、写一段简介、并给出 10 个利于搜索曝光的标签。\n整集内容要点：\n{}\n{}\n\n风格要求：{style}。\n\n标签要求（搜索引擎优化，让更多用户搜得到）：恰好 10 个；第一个必须是 \"reaction\"；其余 9 个按被搜索的可能性从高到低覆盖——剧名与主要角色名、题材/类型词（如「悬疑」「都市情感」）、平台热门通用词（如「影视解说」「追剧」「下饭」）、内容亮点的具体长尾词；用单词或两三个字的短语，不重复、不成句。\n\n返回格式：{{\"title\":\"不超过 30 字的标题\",\"description\":\"两三句简介\",\"tags\":[\"reaction\",\"标签2\",\"标签3\",\"标签4\",\"标签5\",\"标签6\",\"标签7\",\"标签8\",\"标签9\",\"标签10\"]}}",
         if has_frames { "和代表性画面截图" } else { "" },
         summaries.join("\n\n"),
         frame_lines.join("\n"),
@@ -465,6 +465,18 @@ mod tests {
         assert!(with.contains("和代表性画面截图"));
         assert!(with.contains("· 第 1 张 @ 1:15"));
         assert!(with.contains("《影视内容》"));
+    }
+
+    #[test]
+    fn title_user_asks_for_ten_searchable_tags() {
+        let text = title_user("剧", "", &["要点".into()], &[]);
+        assert!(text.contains("并给出 10 个利于搜索曝光的标签"));
+        assert!(text.contains("恰好 10 个"));
+        assert!(text.contains("第一个必须是 \"reaction\""));
+        assert!(
+            text.contains("\"tags\":[\"reaction\",\"标签2\""),
+            "the format example shows reaction first and ten slots"
+        );
     }
 
     #[test]

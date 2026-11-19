@@ -8,8 +8,17 @@ edition = "2021"
 # 自 opencut 的 N-API 原生模块移植为纯 Rust 库。
 #
 # sherpa-onnx 用 Rust fork（上游无 update_hotwords_text /
-# get_sensevoicesmall_result，rev 锁定在 Cargo.lock）；默认 static
-# feature = 构建期下载并静态链接预编译 C 库，运行时零 dylib 依赖。
+# get_sensevoicesmall_result，rev 锁定在 Cargo.lock）。fork 默认的 static
+# feature = 构建期下载预编译 C **静态库**（/MT）链进程序，运行时零 dylib
+# 依赖——但 /MT 静态库把宿主钉死在 /MT（LNK2038），而 Windows 宿主必须
+# /MD：人脸线的 ort 官方预编译（pyke CDN 的静态 ONNX Runtime）是 /MD 构建
+# （见 .cargo/config.toml 的说明）。Windows 上改走 `shared`：上游
+# k2-fsa/sherpa-onnx v1.13.2 发布了与 fork build.rs 期望名完全一致的
+# `win-x64-shared-MT-Release-lib` 包（自包含 DLL，自带 CRT 与捆绑的
+# onnxruntime.dll 1.24.4，宿主 CRT 无关）；fork 自己的 releases 只有
+# static 包，构建期用 SHERPA_ONNX_ARCHIVE_DIR 指向上游包的本地副本
+# （CI 见 .github/workflows/build.yml 的下载步骤）。其余目标
+# （macOS/Linux）没有 MSVC CRT 配对问题，保持默认 static。
 #
 # 该 C 依赖构建期要从 GitHub 拉预编译库且要求 C 工具链，故放在
 # `sensevoice` feature 之后（非默认）：工作区默认构建不碰它；接入
@@ -21,6 +30,13 @@ crate-type = ["rlib"]
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+sherpa-onnx = { git = "https://github.com/letdevme/hotword.git", optional = true, default-features = false, features = [
+    "shared",
+] }
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
 sherpa-onnx = { git = "https://github.com/letdevme/hotword.git", optional = true }
 
 [features]

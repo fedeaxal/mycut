@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 Jareer and Reacut contributors
 
 //! The phone's decoders, over the studio's own clean-room codecs — the same
-//! `filmcraft-h264` and `filmcraft-opus` the editor ships, so a phone camera
+//! `filmcraft-h264` and `craft-audio` the editor ships, so a phone camera
 //! adds no second codec stack. Push decoders both: the session thread hands
 //! one access unit (or one Opus packet) in, and finished pictures come back
 //! out.
@@ -14,8 +14,8 @@
 
 use std::sync::{Arc, Mutex};
 
+use craft_audio::opus::StreamDecoder;
 use filmcraft_h264::Decoder as H264Decoder;
-use filmcraft_opus::StreamDecoder;
 
 use crate::{DecodedPicture, VideoSink};
 
@@ -191,6 +191,10 @@ impl super::phone_decode::PhoneDecoder for MediaH264Decoder {
 
     fn skip_until_idr(&mut self) {
         MediaH264Decoder::skip_until_idr(self)
+    }
+
+    fn waiting_keyframe(&self) -> bool {
+        self.skip_until_idr
     }
 }
 

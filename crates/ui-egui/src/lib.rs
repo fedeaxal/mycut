@@ -241,6 +241,13 @@ pub struct FilmcraftApp {
     pub playback: Playback,
     pub source_playback: source_playback::SourcePlayback,
     pub audio: Option<Box<dyn AudioOut>>,
+    /// Audio during scrubbing (#211), on its own output so opening it never waits for the device
+    /// (#2633). Falls back to `audio` when the platform layer installs none (headless tests).
+    pub scrub_out: Option<Box<dyn scrub::ScrubOut>>,
+    /// The sequence sample rate `scrub_out` was last configured for (`sync_scrub_output`).
+    pub(crate) scrub_rate: Option<u32>,
+    /// The sequence the open scrub stream's fill was built for (`sync_scrub_output`).
+    pub(crate) scrub_sequence: Option<filmcraft_project::ItemId>,
     /// Audio during scrubbing (#211).
     pub scrub: scrub::ScrubAudio,
     pub hooks: HostHooks,
@@ -425,11 +432,6 @@ pub struct FilmcraftApp {
     pub(crate) stale_clipboard_media: Option<String>,
     /// GPU compositor (when running on wgpu): device state + compositor + the egui texture it feeds.
     pub gpu: Option<GpuState>,
-    /// The window's wgpu render state even when [`Self::gpu`] is `None`: the embedded Reaction
-    /// page builds its engine on this device whether or not the host's own compositor can use
-    /// it (on a machine whose only wgpu adapter is software, the Reaction preview still works
-    /// through it while the host composites on the CPU).
-    pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
     /// Preview render job being watched (job id, where to start playing when it completes).
     watched_render: Option<(u64, Tick)>,
     /// The status bar's running-job text as last shown.

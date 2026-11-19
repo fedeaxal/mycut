@@ -72,7 +72,22 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         mu.style_mut().visuals.widgets.inactive.weak_bg_fill = Color32::TRANSPARENT;
         mu.style_mut().visuals.widgets.inactive.bg_stroke = Stroke::NONE;
         mu.style_mut().visuals.override_text_color = Some(t.text_dim);
-        crate::menus::menu_bar(app, &mut mu);
+        // While the Reaction page is up its menus take the bar over, and
+        // leaving the page brings this application's back — the same taking
+        // over and handing back a Mac does between two NSMenus, drawn here
+        // instead of in the system bar. (On macOS the native menu bar owns
+        // both and `show_menu_bar` is false; the branch never runs.)
+        let reaction_menu = cfg!(not(target_os = "macos"))
+            && app.ui.mode == Mode::Reaction
+            && app.reaction.is_some();
+        if reaction_menu {
+            #[cfg(not(target_os = "macos"))]
+            if let Some(reaction) = app.reaction.as_mut() {
+                reaction.paint_menu_bar(&mut mu);
+            }
+        } else {
+            crate::menus::menu_bar(app, &mut mu);
+        }
         left_end = mu.min_rect().max.x;
     }
     // The right end of the header — document title, quick actions, the

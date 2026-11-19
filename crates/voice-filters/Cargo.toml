@@ -1,0 +1,7 @@
+[package]
+name = "goby-dsp"
+version = "0.4.0"
+edition = "2024"
+publish = false
+description = "Goby's voices: the pitch shifter, the effects and the microphone cleanup."
+license = "GPL-3.0-or-later"

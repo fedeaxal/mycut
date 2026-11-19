@@ -43,8 +43,10 @@ pub const MAX_PENDING: usize = 512;
 /// The built-in filter when `RUST_LOG` is unset or empty. The embedded half
 /// (`reaction*` — the Reaction page's own crate) speaks `tracing`, which the
 /// embedded start-up bridges onto this logger, and is let through at `info`
-/// like the host's own records.
-pub const DEFAULT_FILTER: &str = "warn,filmcraft*=info,reaction*=info";
+/// like the host's own records. `webrtc` (the phone camera: its 5s link
+/// summary and the keyframe-gate events are what a dropped-frame report
+/// needs) joins them at `info`.
+pub const DEFAULT_FILTER: &str = "warn,filmcraft*=info,reaction*=info,webrtc=info";
 
 /// Per-target level filter parsed from env_logger-style directives.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -153,6 +155,8 @@ pub fn rotate(dir: &Path) -> std::io::Result<(PathBuf, File)> {
 /// One formatted log line: `<timestamp> <LEVEL> [<thread>] <target>: <message>\n`.
 pub fn format_line(ts: &str, level: log::Level, thread: &str, target: &str, message: &str) -> String {
     let message = message.strip_suffix('\n').unwrap_or(message);
+    // Escape control characters so message text (a project's `format` field, say) cannot start a fake record.
+    let message: String = message.chars().flat_map(|c| if c.is_control() { c.escape_default().collect::<Vec<_>>() } else { vec![c] }).collect();
     format!("{ts} {level:<5} [{thread}] {target}: {message}\n")
 }
 
@@ -330,6 +334,11 @@ mod tests {
         // targets speak at `info` like the host's own.
         assert_eq!(f.level_for("reaction"), LevelFilter::Info);
         assert_eq!(f.level_for("reaction::engine"), LevelFilter::Info);
+        // The phone camera's link diagnostics (5s summary, keyframe-gate
+        // events) are what a dropped-frame report reads, so they pass by
+        // default too.
+        assert_eq!(f.level_for("webrtc"), LevelFilter::Info);
+        assert_eq!(f.level_for("webrtc::phone"), LevelFilter::Info);
         // media's records are forwarded onto the same logger and answer to
         // the same filter — no directive of their own, so the default
         // (`warn`) tier holds them.
@@ -452,8 +461,9 @@ mod tests {
             format_line("2026-10-08T07:59:17.728Z", log::Level::Warn, "main", "filmcraft_ui_egui", "audio output unavailable: no output device"),
             "2026-10-08T07:59:17.728Z WARN  [main] filmcraft_ui_egui: audio output unavailable: no output device\n"
         );
-        // A multi-line message keeps its lines; the record still ends in exactly one newline.
-        assert!(format_line("t", log::Level::Error, "w", "x", "a\nb\n").ends_with("x: a\nb\n"));
+        // Control characters are escaped, so a multi-line message stays one record ending in exactly one newline.
+        assert!(format_line("t", log::Level::Error, "w", "x", "a\nb\n").ends_with("x: a\\nb\n"));
+        assert_eq!(format_line("t", log::Level::Error, "w", "x", "a\r\n2026 INFO fake").matches('\n').count(), 1);
     }
 
     #[test]

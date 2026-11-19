@@ -65,6 +65,12 @@ impl FilmcraftApp {
         // Leaving Reaction mode hands the menu bar back: reaction replaced it while that page drew
         // (macOS), and nothing else restores ours — see `HostHooks::restore_menu`.
         self.note_mode_change();
+        if self.ui.fullscreen_program {
+            ui.painter().rect_filled(full, 0.0, egui::Color32::BLACK);
+            panels::monitor::show(self, ui, full, panels::monitor::Which::Program);
+            ui.ctx().set_cursor_icon(egui::CursorIcon::None);
+            return;
+        }
         let header_h = if self.ui.show_header { header::HEIGHT } else { 0.0 };
         let header = egui::Rect::from_min_size(full.min, egui::vec2(full.width(), header_h));
         if self.ui.show_header {

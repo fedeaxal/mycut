@@ -21,7 +21,7 @@
 //! * **Media** — H.264 payloads go through [`H264Depacketizer`] → the
 //!   studio's own `filmcraft-h264` decoder (see `phone_decode`) →
 //!   [`VideoSink`]; Opus payloads are Opus packets already, decoded by the
-//!   studio's own `filmcraft-opus` to interleaved stereo f32 and pushed
+//!   studio's own `craft-audio` Opus to interleaved stereo f32 and pushed
 //!   into the [`AudioSink`].
 //!
 //! Session lifetime: one phone at a time, on one process-wide signaling
@@ -47,7 +47,7 @@ mod phone;
 mod phone_decode;
 
 pub use decoders::{MediaH264Decoder, MediaOpusDecoder};
-pub use h264_depacketizer::{DepackOutcome, H264Depacketizer};
+pub use h264_depacketizer::{DepackDropReason, DepackOutcome, H264Depacketizer};
 pub use phone::{
     PhoneSession, SessionStatus, SIGNALING_PORT, default_route_ip, pairing_url, phone_session_id,
     session_status, set_pairing_candidates, take_connected, take_failed,
@@ -85,7 +85,7 @@ pub trait VideoSink: Send + Sync {
 }
 
 /// Where decoded phone audio goes. Interleaved stereo 48 kHz f32 (the
-/// decoder outputs interleaved directly — see `filmcraft-opus`'s
+/// decoder outputs interleaved directly — see `craft-audio`'s
 /// `StreamDecoder`).
 pub trait AudioSink: Send + Sync {
     fn push(&self, samples: &[f32]);

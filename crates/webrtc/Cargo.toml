@@ -9,9 +9,10 @@ license.workspace = true
 # The studio's own clean-room codecs — H.264 (ITU-T Rec. H.264) and Opus
 # (RFC 6716) decoded in Rust. One codec stack for the whole program: the
 # editor ships these already, and a phone's 720p stream is a light load
-# even in software.
+# even in software. Opus now lives in craft-audio (opus-decode, pulled in
+# by the workspace dependency's feature set).
 filmcraft-h264.workspace = true
-filmcraft-opus.workspace = true
+craft-audio.workspace = true
 log.workspace = true
 # The self-signed certificate the phone's browser warns about once.
 rcgen = "0.13"

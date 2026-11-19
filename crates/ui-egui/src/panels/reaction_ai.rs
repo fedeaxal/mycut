@@ -555,8 +555,21 @@ impl ReactionAiState {
                     ui.label(egui::RichText::new(text).color(colour));
                 }
                 ui.add_space(10.0);
-                ui.horizontal(|ui| {
+                // 按钮排到右缘:确定最右,取消在其左,测试连接(表单辅助)
+                // 最左——RTL 布局先加的在右。
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.set_height(BUTTON_ROW_HEIGHT);
+                    let ok = ui.add(
+                        egui::Button::new(egui::RichText::new(tl!("OK")).color(Color32::WHITE))
+                            .fill(app.tokens.accent)
+                            .min_size(egui::vec2(64.0, 20.0)),
+                    );
+                    if ok.clicked() {
+                        apply = true;
+                    }
+                    if ui.button(tl!("Cancel")).clicked() {
+                        keep = false;
+                    }
                     let test = ui.add_enabled(
                         !testing,
                         egui::Button::new(if testing {
@@ -571,20 +584,6 @@ impl ReactionAiState {
                             Err(e) => draft.test_result = Some(Err(e)),
                         }
                     }
-                    if ui.button(tl!("Cancel")).clicked() {
-                        keep = false;
-                    }
-                    let ok = ui.add(
-                        egui::Button::new(egui::RichText::new(tl!("OK")).color(Color32::WHITE))
-                            .fill(app.tokens.accent)
-                            .min_size(egui::vec2(64.0, 20.0)),
-                    );
-                    if ok.clicked() {
-                        apply = true;
-                    }
-                    // 把两个按钮推到右缘:剩余宽度全部交给间隔(LTR,两趟一致)。
-                    let rest = ui.available_width().max(0.0);
-                    ui.add_space(rest);
                 });
             });
         if !open || crate::widgets::escape_closes(ctx) {
