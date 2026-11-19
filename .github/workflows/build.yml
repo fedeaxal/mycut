@@ -12,6 +12,14 @@ name: Build
 #   from the private fedeaxal/reaction with a personal access token in
 #   REACTION_REPO_TOKEN. `apps/filmcraft` embeds it as a path dependency, so
 #   nothing builds until the clone lands where the manifest looks for it.
+# - `Cargo.lock` is generated against apps/reaction as it stands in the studio
+#   workspace, and every build runs --locked: the clone must match that lock
+#   or resolution dies. Each job therefore verifies the lock right after
+#   installing Rust and fails early — printing the would-be diff — instead of
+#   losing the run to a --locked error inside Package, after the slow setup
+#   steps have already burned their minutes. When it fails, the fork's default
+#   branch and the lock have drifted: sync the fork with the studio copy of
+#   apps/reaction (or regenerate Cargo.lock against the fork) and commit it.
 # - The Reaction page is built without its `browser` feature — the default —
 #   so CEF is neither fetched nor compiled nor shipped: no CEF_PATH, no Ninja,
 #   no browser engine in the installers.
@@ -78,13 +86,37 @@ jobs:
       # command's `$LASTEXITCODE` and a failing native command does not stop
       # the script, so a multi-command step swallows every failure but the
       # final one.
+      # static.rust-lang.org blips (transient DNS resolution failures on the
+      # runner) have killed runs here; they clear within seconds, so retry
+      # before failing a build that would otherwise have been fine.
       - name: Install Rust toolchain
         shell: pwsh
-        run: rustup toolchain install stable --profile minimal
+        run: |
+          foreach ($i in 1, 2, 3) {
+            rustup toolchain install stable --profile minimal
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            Write-Host "rustup attempt $i failed; retrying in 20s"
+            Start-Sleep -Seconds 20
+          }
+          throw "rustup failed after 3 attempts"
 
       - name: Select Rust toolchain
         shell: pwsh
         run: rustup default stable
+
+      # See the header: the lock was written against the studio copy of
+      # apps/reaction, and this job cloned fedeaxal/reaction instead. Verify
+      # before the slow setup steps, not inside Package twenty minutes later.
+      - name: Verify Cargo.lock covers the checked-out reaction
+        shell: pwsh
+        run: |
+          cargo metadata --locked --format-version 1 > $null
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::Cargo.lock does not match the checked-out reaction. Sync fedeaxal/reaction with the studio copy of apps/reaction (or regenerate Cargo.lock against the fork) and commit the lock. The would-be changes:"
+            cargo update --workspace --dry-run
+            exit 1
+          }
+          Write-Host "Cargo.lock matches the checked-out workspace"
 
       - name: Set up FFmpeg
         uses: ./.github/actions/setup-ffmpeg
@@ -228,10 +260,35 @@ jobs:
           ref: ${{ inputs.reaction-ref }}
           path: apps/reaction
 
+      # macos-15-intel has failed this step with transient DNS errors
+      # ("nodename nor servname provided, or not known" against
+      # static.rust-lang.org); they clear within seconds, so retry before
+      # failing the job.
       - name: Install Rust
         run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
+          for i in 1 2 3; do
+            if rustup toolchain install stable --profile minimal && rustup default stable; then
+              exit 0
+            fi
+            echo "rustup attempt $i failed; retrying in 20s" >&2
+            sleep 20
+          done
+          echo "rustup failed after 3 attempts" >&2
+          exit 1
+
+      # See the header: the lock was written against the studio copy of
+      # apps/reaction, and this job cloned fedeaxal/reaction instead. Verify
+      # before the slow setup steps, not inside Package twenty minutes later.
+      - name: Verify Cargo.lock covers the checked-out reaction
+        run: |
+          set -euo pipefail
+          if cargo metadata --locked --format-version 1 > /dev/null 2>&1; then
+            echo "Cargo.lock matches the checked-out workspace"
+            exit 0
+          fi
+          echo "::error::Cargo.lock does not match the checked-out reaction. Sync fedeaxal/reaction with the studio copy of apps/reaction (or regenerate Cargo.lock against the fork) and commit the lock. The would-be changes:"
+          cargo update --workspace --dry-run || true
+          exit 1
 
       - name: Set up FFmpeg
         uses: ./.github/actions/setup-ffmpeg
