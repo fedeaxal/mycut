@@ -309,23 +309,43 @@ jobs:
           restore-keys: cargo-${{ runner.os }}-
 
       # The face pipeline's inference engine, on both macOS legs: Microsoft's
-      # official dylib, downloaded from their GitHub release and loaded at run
-      # time (`load-dynamic` — the facelandmark Cargo.toml splits macOS this
-      # way; the Windows job still statically links pyke's prebuilt). Both
-      # legs carry 1.23.2: the last release Microsoft shipped an osx binary
-      # for, and the replacement for 1.23.0, which was withdrawn upstream —
-      # the 404 that broke this job before. It loads because `ort`, with no
-      # api-* feature enabled anywhere in the tree, requests C API version
-      # 17, which every runtime from 1.17 on answers; the CoreML EP ships
-      # inside the dylib, which is what the arm64 EP list asks for. It
-      # arrives ad-hoc signed and is re-signed ad hoc by the packaging
-      # script, which is what Apple silicon requires of it.
+      # official dylib, loaded at run time (`load-dynamic` — the facelandmark
+      # Cargo.toml splits macOS this way; the Windows job still statically
+      # links pyke's prebuilt). Both legs carry 1.23.2: the last release
+      # Microsoft shipped an osx binary for, and the replacement for 1.23.0,
+      # which was withdrawn upstream — the 404 that broke this job before.
+      # It loads because `ort`, with no api-* feature enabled anywhere in the
+      # tree, requests C API version 17, which every runtime from 1.17 on
+      # answers; the CoreML EP ships inside the dylib, which is what the
+      # arm64 EP list asks for. It arrives ad-hoc signed and is re-signed ad
+      # hoc by the packaging script, which is what Apple silicon requires of
+      # it. The release tarball now comes from PhotoPrism's long-standing
+      # mirror of the official assets: microsoft/onnxruntime vanished from
+      # GitHub outright on 2026-11-17 (404 for the whole repository —
+      # sources, releases and all), so the official URL is tried first for
+      # self-healing but the mirror is what actually answers; the checksum
+      # pins whichever copy arrives to the official bytes.
       - name: Download ONNX Runtime
         run: |
           set -euo pipefail
           version="${{ matrix.ort-version }}"
           root="onnxruntime-osx-${{ matrix.ort-arch }}-$version"
-          curl -fsSL "https://github.com/microsoft/onnxruntime/releases/download/v$version/$root.tgz" -o "$RUNNER_TEMP/$root.tgz"
+          # sha256 of the official release tarballs, as mirrored at
+          # dl.photoprism.app (verified against the mirror's copy: same
+          # GIT_COMMIT_ID a83fc4d5, same layout, ad-hoc signed — unlike
+          # csukuangfj/onnxruntime-libs' repackaged zips, which are a
+          # different rebuild without CoreML guarantees).
+          case "${{ matrix.ort-arch }}" in
+            arm64)
+              want="b4d513ab2b26f088c66891dbbc1408166708773d7cc4163de7bdca0e9bbb7856"
+              ;;
+            x86_64)
+              want="d10359e16347b57d9959f7e80a225a5b4a66ed7d7e007274a15cae86836485a6"
+              ;;
+          esac
+          curl -fsSL "https://github.com/microsoft/onnxruntime/releases/download/v$version/$root.tgz" -o "$RUNNER_TEMP/$root.tgz" \
+            || curl -fsSL "https://dl.photoprism.app/onnx/runtime/v$version/$root.tgz" -o "$RUNNER_TEMP/$root.tgz"
+          echo "$want  $RUNNER_TEMP/$root.tgz" | shasum -a 256 -c -
           mkdir -p .onnxruntime
           # The whole package, then the files that ship: the tarball nests
           # everything under `./onnxruntime-...`, and the cp below strips

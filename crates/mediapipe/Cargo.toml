@@ -34,10 +34,15 @@ tracy-client = "0.18.0"
 # 这要求宿主动态 CRT（pyke 的静态库是 /MD 构建，/MT 宿主链接必败），
 # 而 /MD 的解锁靠 ASR 侧的 sherpa-onnx 换成自包含 DLL（`asr` crate 的
 # Windows 目标用 sherpa `shared`，见 crates/asr/Cargo.toml 与
-# .cargo/config.toml 的说明）。`copy-dylibs` 会把 pyke 附带的
-# DirectML.dll 1.15.4 复制到产物目录随包发布；exe 旁的 onnxruntime.dll
-# 是 sherpa 包带的 1.24.4（只有 ASR DLL 用它——人脸线是静态的，不加载
-# 任何 onnxruntime.dll）。
+# .cargo/config.toml 的说明）。pyke 附带的 DirectML.dll 1.15.4 不走
+# copy-dylibs（新版 Rust 把 build script 的 OUT_DIR 布局改成
+# build/ort-sys/<fp>/out 后，rc.13 的 copy_dylibs 按 ancestors().nth(3)
+# 推目标目录会落到 release/build/，往不存在的 build\examples 复制时
+# fs::copy 直接 panic os error 3——上游修复见 pykeio/ort eed568160；
+# CI 2026-11-20 Windows Package 实锤），改由 packaging/windows/
+# package.ps1 从 ort-sys 的下载缓存取 DLL 随包发布；exe 旁的
+# onnxruntime.dll 是 sherpa 包带的 1.24.4（只有 ASR DLL 用它——人脸线
+# 是静态的，不加载任何 onnxruntime.dll）。
 #
 # 其余目标（Intel macOS / Linux）：官方没有 Intel mac 的预编译，走
 # load-dynamic（CI 的 x86_64 mac 包携带 1.23.2 dylib；ort 未开任何 api-*
@@ -59,7 +64,6 @@ ort = { version = "2.0.0-rc.13", default-features = false, features = [
     "ndarray",
     "download-binaries",
     "tls-native",
-    "copy-dylibs",
     "directml",
 ] }
 

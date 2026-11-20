@@ -99,7 +99,9 @@ Copy-Item (Join-Path $Bin 'filmcraft.exe'), (Join-Path $Bin 'filmcraft-cli.exe')
 # official prebuilt, statically linked into the executables — no onnxruntime.dll for it. The DLLs
 # that do ship come from the build tree the steps above populated: sherpa-onnx-c-api.dll (the ASR
 # worker, built by CI from the fork — with its bundled onnxruntime.dll 1.24.4 for itself) and
-# DirectML.dll (pyke's copy-dylibs drops it beside the binaries for the statically linked DML EP).
+# DirectML.dll for the statically linked DML EP, staged from ort-sys's download cache just below
+# (copy-dylibs is off: recent Rust versions changed the build-script OUT_DIR layout and broke it —
+# see crates/mediapipe/Cargo.toml).
 # The executables are /MD, so the VC++ redistributable's DLLs always ride along.
 $Lic = Join-Path $Stage 'licences'
 if ($env:FFMPEG_DIR) {
@@ -110,6 +112,19 @@ if ($env:FFMPEG_DIR) {
   New-Item -ItemType Directory -Force -Path $Lic | Out-Null
   Get-ChildItem (Join-Path $env:FFMPEG_DIR 'share') -Filter copyright -Recurse |
     ForEach-Object { Copy-Item $_.FullName (Join-Path $Lic "$($_.Directory.Name).txt") }
+}
+# ort-sys's copy-dylibs used to drop DirectML.dll beside the binaries, but recent Rust
+# versions changed the build-script OUT_DIR layout (target/<triple>/release/build/ort-sys/<fp>/out),
+# so its hardcoded ancestors().nth(3) landed on release/build/ and the fallback fs::copy into the
+# nonexistent build\examples panicked (os error 3; upstream fix: pykeio/ort eed568160). The feature
+# is therefore off (crates/mediapipe/Cargo.toml) and we take the DLL straight from ort-sys's
+# download cache, which the cargo build above populated (dfbin\<target>\<dist hash>\DirectML.dll).
+$ortDist = Get-ChildItem (Join-Path $env:LOCALAPPDATA "ort.pyke.io\dfbin\$Target") -Directory -ErrorAction SilentlyContinue |
+  Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if ($ortDist -and (Test-Path (Join-Path $ortDist.FullName 'DirectML.dll'))) {
+  Copy-Item (Join-Path $ortDist.FullName 'DirectML.dll') $Bin
+} else {
+  throw "DirectML.dll not found in the ort-sys download cache ($env:LOCALAPPDATA\ort.pyke.io\dfbin\$Target\<dist>) — run the cargo build above first"
 }
 foreach ($dll in @('sherpa-onnx-c-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'DirectML.dll')) {
   $src = Join-Path $Bin $dll
