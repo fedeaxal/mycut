@@ -896,7 +896,7 @@ fn run() -> Result<(), Error> {
         tracy_client::Client::start();
     }
     // 必须在任何 ort API 之前调用
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
     if let Some(lib) = &args.ort_lib {
         // rc.13：init_from 直接加载动态库并返回 Result；commit 由首个 Session 隐式完成
         ort::init_from(lib)
@@ -904,7 +904,7 @@ fn run() -> Result<(), Error> {
     }
     // Windows 官方预编译静态链接:运行时已随程序链接并自行初始化,没有
     // init_from——目标划分与 facelandmark 的 Cargo.toml 一致。
-    #[cfg(target_os = "windows")]
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
     if args.ort_lib.is_some() {
         eprintln!("提示: 本构建静态链接 ort 官方预编译库,--ort-lib 已忽略");
     }
