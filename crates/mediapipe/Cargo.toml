@@ -30,26 +30,27 @@ tracy-client = "0.18.0"
 # 1.23.2 的 osx-arm64 库；1.23.0 被微软撤回，由 1.23.2 取代）。coreml
 # feature 只把 CoreML EP 的 API 绑定编译进来，EP 本体在 dylib 里。
 #
-# Windows：同样 ort 官方预编译（directml flavor，DirectML EP 内置）。
-# 这要求宿主动态 CRT（pyke 的静态库是 /MD 构建，/MT 宿主链接必败），
-# 而 /MD 的解锁靠 ASR 侧的 sherpa-onnx 换成自包含 DLL（`asr` crate 的
-# Windows 目标用 sherpa `shared`，见 crates/asr/Cargo.toml 与
-# .cargo/config.toml 的说明）。pyke 附带的 DirectML.dll 1.15.4 不走
-# copy-dylibs（新版 Rust 把 build script 的 OUT_DIR 布局改成
-# build/ort-sys/<fp>/out 后，rc.13 的 copy_dylibs 按 ancestors().nth(3)
-# 推目标目录会落到 release/build/，往不存在的 build\examples 复制时
-# fs::copy 直接 panic os error 3——上游修复见 pykeio/ort eed568160；
-# CI 2026-11-20 Windows Package 实锤），改由 packaging/windows/
-# package.ps1 从 ort-sys 的下载缓存取 DLL 随包发布；exe 旁的
-# onnxruntime.dll 是 sherpa 包带的 1.24.4（只有 ASR DLL 用它——人脸线
-# 是静态的，不加载任何 onnxruntime.dll）。
+# Windows：同样 load-dynamic，运行时加载微软官方 DirectML NuGet 的
+# onnxruntime.dll（CPU 与 DirectML EP 内置，DirectML 静态内链——无需单独
+# 的 DirectML.dll）。pyke CDN 的 download-binaries 静态库是 AVX2 目标编译
+# 的（ort 官方文档明言其 Windows 静态版要求 AVX2），其 C++ 全局初始化在
+# main 之前就执行 SHLX/MULX 一类 BMI2 指令，Ivy Bridge（i5-3470）这类不
+# 支持 AVX2/BMI2 的老 CPU 上启动即崩 0xC000001D（CI 包 2026-11-21 实锤）；
+# 微软官方预编译按 CPU 特性做运行时分发，无此问题，故与其余目标一致走
+# load-dynamic——exe 不再链任何 ORT 字节，ORT 全部来自随包的官方 DLL。
+# directml feature 只把 DML EP 的 API 绑定编译进来，EP 本体在 DLL 里。
+# 随包 DLL 取 1.24.4（微软最后一个官方 DirectML 版构建），由 CI 从
+# nuget.org 拉取 Microsoft.ML.OnnxRuntime.DirectML 并覆盖 sherpa cmake
+# 自带的 CPU-only 副本——版本同为 1.24.4，ASR 侧 sherpa DLL 的 C API
+# 请求不受影响，人脸线与 ASR 共用这一份（见 .github/workflows/build.yml
+# 与 packaging/windows/package.ps1）。
 #
 # 其余目标（Intel macOS / Linux）：官方没有 Intel mac 的预编译，走
 # load-dynamic（CI 的 x86_64 mac 包携带 1.23.2 dylib；ort 未开任何 api-*
 # feature 时请求 C API 17，1.17 起的运行时都能应答）。这两个目标 Auto 恒
 # CPU——Intel 核显上 CoreML 实测反而更慢。
-# 注意：代码里 init_from 的调用点按同一目标划分 cfg——若调整这里的目标
-# 归属，需同步 facelandmark-cli 与 reaction::face::detect。
+# 所有目标都 load-dynamic：init_from 的调用点不再按目标划分 cfg，但调整
+# 这里的 EP feature 归属仍需同步 utils::Ep 的文档与 push_ep 的 cfg 臂。
 [target.'cfg(all(target_os = "macos", target_arch = "aarch64"))'.dependencies]
 ort = { version = "2.0.0-rc.13", default-features = false, features = [
     "std",

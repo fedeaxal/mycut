@@ -16,7 +16,7 @@
     "filmcraft.exe",
     "sherpa-onnx-c-api.dll",
     "onnxruntime.dll",
-    "DirectML.dll",
+    "onnxruntime_providers_shared.dll",
     "vcruntime140.dll"
   ],
   "registry": [

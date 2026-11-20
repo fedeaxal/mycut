@@ -10,12 +10,15 @@ edition = "2021"
 # sherpa-onnx 用 Rust fork（上游无 update_hotwords_text /
 # get_sensevoicesmall_result，rev 锁定在 Cargo.lock）。fork 默认的 static
 # feature = 构建期下载预编译 C **静态库**（/MT）链进程序，运行时零 dylib
-# 依赖——但 /MT 静态库把宿主钉死在 /MT（LNK2038），而 Windows 宿主必须
-# /MD：人脸线的 ort 官方预编译（pyke CDN 的静态 ONNX Runtime）是 /MD 构建
-# （见 .cargo/config.toml 的说明）。Windows 上改走 `shared`：上游
+# 依赖——但 /MT 静态库把宿主钉死在 /MT（LNK2038），而 Windows 宿主是
+# /MD（初因 pyke CDN 的 ort 静态库 /MD 构建；ort 现已全线 load-dynamic、
+# 不再约束宿主 CRT，见 .cargo/config.toml 与 crates/mediapipe/Cargo.toml
+# 的说明）。Windows 上改走 `shared`：上游
 # k2-fsa/sherpa-onnx v1.13.2 发布了与 fork build.rs 期望名完全一致的
 # `win-x64-shared-MT-Release-lib` 包（自包含 DLL，自带 CRT 与捆绑的
-# onnxruntime.dll 1.24.4，宿主 CRT 无关）；fork 自己的 releases 只有
+# onnxruntime.dll 1.24.4，宿主 CRT 无关；其 CPU-only 的 onnxruntime.dll
+# 在打包时被微软官方 DirectML NuGet 的同版本 DLL 覆盖，见
+# packaging/windows/package.ps1）；fork 自己的 releases 只有
 # static 包，构建期用 SHERPA_ONNX_ARCHIVE_DIR 指向上游包的本地副本
 # （CI 见 .github/workflows/build.yml 的下载步骤）。其余目标
 # （macOS/Linux）没有 MSVC CRT 配对问题，保持默认 static。

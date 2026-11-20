@@ -895,18 +895,12 @@ fn run() -> Result<(), Error> {
     if args.tracy {
         tracy_client::Client::start();
     }
-    // 必须在任何 ort API 之前调用
-    #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+    // 必须在任何 ort API 之前调用(所有目标都 load-dynamic,见 facelandmark
+    // 的 Cargo.toml)
     if let Some(lib) = &args.ort_lib {
         // rc.13：init_from 直接加载动态库并返回 Result；commit 由首个 Session 隐式完成
         ort::init_from(lib)
             .map_err(|e| anyhow::anyhow!("加载 onnxruntime 失败: {}: {e}", lib.display()))?;
-    }
-    // Windows 官方预编译静态链接:运行时已随程序链接并自行初始化,没有
-    // init_from——目标划分与 facelandmark 的 Cargo.toml 一致。
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    if args.ort_lib.is_some() {
-        eprintln!("提示: 本构建静态链接 ort 官方预编译库,--ort-lib 已忽略");
     }
 
     if args.segment {

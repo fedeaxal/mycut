@@ -14,10 +14,11 @@ runner = "packaging/macos/run-app.sh"
 # dynamic-CRT (/MD) host failed to link it (LNK2038, "RuntimeLibrary
 # mismatch"). sherpa-onnx now links through its self-contained DLL
 # (`sherpa-onnx/shared` — its DLLs carry their own CRT, host CRT is
-# irrelevant, and its bundled onnxruntime.dll is 1.24.4), which frees the
-# host to be /MD — required by the face pipeline's ort official prebuilt
-# (pyke's statically-linked ONNX Runtime is /MD-built; a /MT host fails its
-# link with a wall of __imp_* LNK2019s). The packages ship the VC++ runtime
-# DLLs for the now-dynamic CRT (packaging/windows/package.ps1 stages them
-# unconditionally). MSVC only: the gnu toolchain links its CRT statically
-# already.
+# irrelevant, and its bundled onnxruntime.dll is 1.24.4), and the face
+# pipeline's onnxruntime is load-dynamic on every target
+# (crates/mediapipe/Cargo.toml) — no dependency constrains the host CRT
+# anymore. /MD stays: it dates from pyke's /MD statics (whose link a /MT
+# host failed with a wall of __imp_* LNK2019s), costs nothing here, and the
+# packages ship the VC++ runtime DLLs regardless for the /MD-built vcpkg
+# FFmpeg DLLs (packaging/windows/package.ps1 stages them unconditionally).
+# MSVC only: the gnu toolchain links its CRT statically already.

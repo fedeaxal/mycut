@@ -56,7 +56,7 @@
     </ComponentGroup>
     <?endif?>
     <?if $(var.HasRuntimeLibraries) = 1 ?>
-    <!-- FFmpeg, sherpa-onnx, ONNX Runtime, DirectML and the VC++ runtime DLLs the executables
+    <!-- FFmpeg, sherpa-onnx, ONNX Runtime and the VC++ runtime DLLs the executables
          load at run time. package.ps1 stages them unconditionally and sets the flag. -->
     <ComponentGroup Id="RuntimeLibraries" Directory="INSTALLFOLDER">
       <Files Include="$(var.BinDir)\*.dll" />

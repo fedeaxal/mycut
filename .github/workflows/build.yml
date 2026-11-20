@@ -139,14 +139,20 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-
 
-      # The face pipeline's inference engine is ort's official prebuilt,
-      # statically linked at build time (ort-sys fetches it from pyke's CDN
-      # while compiling `facelandmark`): 1.28.0, the version `ort`
-      # 2.0.0-rc.13 is developed against, with the DirectML EP compiled in —
-      # no onnxruntime.dll is needed for the face pipeline. The pyke static
-      # library is /MD-built, which is why the host build is /MD (no
-      # +crt-static — see .cargo/config.toml for how that follows from the
-      # ASR worker's sherpa-onnx switching to a self-contained DLL).
+      # The face pipeline's inference engine loads at run time, like on the
+      # macOS legs (`load-dynamic` — crates/mediapipe/Cargo.toml): Microsoft's
+      # official onnxruntime.dll, downloaded below from nuget.org and staged
+      # beside the executable by package.ps1. It replaced ort's pyke
+      # download-binaries statics, which are AVX2-compiled: their C++
+      # initializers executed BMI2 instructions before main and the launcher
+      # died with 0xc000001d on pre-AVX2 CPUs (an Ivy Bridge i5-3470;
+      # 2026-11-21). The official build dispatches CPU features at run time,
+      # carries the DirectML EP statically linked inside, and its 1.24.4 C
+      # API also serves the ASR DLL built below against 1.24.4 — so it
+      # supersedes the CPU-only onnxruntime.dll the sherpa cmake stages. The
+      # host build stays /MD (no +crt-static — see .cargo/config.toml; pyke's
+      # /MD statics were the original constraint, and the vcpkg FFmpeg DLLs'
+      # own /MD keeps the redistributable shipped either way).
       #
       # That DLL — sherpa-onnx-c-api.dll — does not exist as a prebuilt asset
       # anywhere: the fork's releases carry static libraries only, and the
@@ -181,12 +187,42 @@ jobs:
           Copy-Item "$env:RUNNER_TEMP\hotword\build\install\lib\*" $lib
           # cmake installs the downloaded ORT runtime DLLs under bin\; the archive
           # sherpa-onnx-sys unpacks must carry them in lib\ beside the import libs.
+          # The CPU-only onnxruntime.dll that lands here is superseded in the
+          # package by the DirectML NuGet's copy (same 1.24.4) — package.ps1.
           Copy-Item "$env:RUNNER_TEMP\hotword\build\install\bin\*.dll" $lib -ErrorAction SilentlyContinue
           if (-not (Test-Path "$lib\sherpa-onnx-c-api.dll") -or -not (Test-Path "$lib\onnxruntime.dll")) {
             throw "sherpa DLLs missing after build (need c-api.dll and onnxruntime.dll in lib\)"
           }
           tar -cjf ".sherpa-shim\$stem.tar.bz2" -C "$env:RUNNER_TEMP" $stem
           if ($LASTEXITCODE -ne 0) { throw "sherpa pack failed ($LASTEXITCODE)" }
+
+      # Microsoft's official DirectML-flavored ONNX Runtime for the face
+      # pipeline (see the step above). 1.24.4 is the last release Microsoft
+      # shipped a DirectML build of. A nuget.org package is byte-identical
+      # for a given version and carries the publisher's signature, so the
+      # sha256 pins the official bytes — no mirror dance here, unlike the
+      # macOS legs whose GitHub release home has 404'd outright since
+      # 2026-11-17. Only the win-x64 runtime files and the licence texts are
+      # extracted; ONNXRUNTIME_DIR hands them to package.ps1. The nupkg is a
+      # zip and the runner's tar (bsdtar) unpacks it by content.
+      - name: Download ONNX Runtime
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path .onnxruntime | Out-Null
+          curl.exe -fsSL -o "$env:RUNNER_TEMP\ort-directml.nupkg" `
+            "https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime.directml/1.24.4/microsoft.ml.onnxruntime.directml.1.24.4.nupkg"
+          if ($LASTEXITCODE -ne 0) { throw "onnxruntime download failed ($LASTEXITCODE)" }
+          $want = '57E9F11B73437BEF7A309496135D4C1F96B1A8E9DDBA60013FA27BFC1D788681'
+          $got = (Get-FileHash -Algorithm SHA256 "$env:RUNNER_TEMP\ort-directml.nupkg").Hash
+          if ($got -cne $want) { throw "onnxruntime nupkg sha256 mismatch: $got" }
+          tar -xf "$env:RUNNER_TEMP\ort-directml.nupkg" -C .onnxruntime `
+            'runtimes/win-x64/native/onnxruntime.dll' `
+            'runtimes/win-x64/native/onnxruntime_providers_shared.dll' `
+            'LICENSE' 'ThirdPartyNotices.txt'
+          if ($LASTEXITCODE -ne 0) { throw "onnxruntime unpack failed ($LASTEXITCODE)" }
+          Move-Item .onnxruntime\runtimes\win-x64\native\*.dll .onnxruntime
+          Remove-Item -Recurse -Force .onnxruntime\runtimes
+          Get-ChildItem .onnxruntime
 
       # The MSI toolchain: `package.ps1` adds the UI extension itself.
       - name: Install WiX
@@ -195,8 +231,8 @@ jobs:
           dotnet tool install --global wix --version 5.0.2
           if ($LASTEXITCODE -ne 0) { throw "wix install failed ($LASTEXITCODE)" }
 
-      # Builds (/MD, per-target), stages the FFmpeg / sherpa-onnx / DirectML /
-      # VC++ runtime DLLs beside the executables, and produces
+      # Builds (/MD, per-target), stages the FFmpeg / sherpa-onnx / ONNX
+      # Runtime / VC++ runtime DLLs beside the executables, and produces
       # filmcraft-<version>-windows-x64.msi and the portable zip. Signing is
       # skipped with a warning: no certificate is configured here.
       - name: Package
@@ -205,6 +241,10 @@ jobs:
           # Where the tar `sherpa-onnx-sys`'s build script resolves (see the
           # DLL build step above); package.ps1 passes it through to cargo.
           SHERPA_ONNX_ARCHIVE_DIR: ${{ github.workspace }}\.sherpa-shim
+          # The official ONNX Runtime for the face pipeline (see the download
+          # step above); package.ps1 stages its DLLs beside the executables,
+          # replacing the sherpa cmake's CPU-only copy.
+          ONNXRUNTIME_DIR: ${{ github.workspace }}\.onnxruntime
         run: pwsh packaging/windows/package.ps1 -Arch x64
 
       - name: Upload the artifacts

@@ -95,13 +95,16 @@ Copy-Item (Join-Path $Bin 'filmcraft.exe'), (Join-Path $Bin 'filmcraft-cli.exe')
 
 # ---- runtime libraries the executables load at run time ----------------------------------------
 # FFmpeg links dynamically and is found beside the executable (FFMPEG_DIR is an optional CI input:
-# without it the installers carry only the executables). The face pipeline's ONNX Runtime is ort's
-# official prebuilt, statically linked into the executables — no onnxruntime.dll for it. The DLLs
-# that do ship come from the build tree the steps above populated: sherpa-onnx-c-api.dll (the ASR
-# worker, built by CI from the fork — with its bundled onnxruntime.dll 1.24.4 for itself) and
-# DirectML.dll for the statically linked DML EP, staged from ort-sys's download cache just below
-# (copy-dylibs is off: recent Rust versions changed the build-script OUT_DIR layout and broke it —
-# see crates/mediapipe/Cargo.toml).
+# without it the installers carry only the executables). The face pipeline's ONNX Runtime is
+# Microsoft's official DirectML NuGet (ONNXRUNTIME_DIR — CI downloads it, see build.yml): its
+# onnxruntime.dll carries the CPU and DirectML EPs with DirectML statically linked inside (no
+# separate DirectML.dll) and dispatches CPU features at run time — the pyke download-binaries
+# statics it replaced are AVX2-compiled and their C++ initializers executed BMI2 instructions
+# before main, killing the launcher on pre-AVX2 CPUs (0xc000001d, an Ivy Bridge i5-3470;
+# 2026-11-21 — see crates/mediapipe/Cargo.toml). The DLL is copied into the build tree first so it
+# also replaces the CPU-only onnxruntime.dll the sherpa cmake stages: same 1.24.4 version, so the
+# ASR DLL's imports are unaffected, and the face line and sherpa share this one runtime.
+# sherpa-onnx-c-api.dll itself comes from the build tree the steps above populated.
 # The executables are /MD, so the VC++ redistributable's DLLs always ride along.
 $Lic = Join-Path $Stage 'licences'
 if ($env:FFMPEG_DIR) {
@@ -113,20 +116,23 @@ if ($env:FFMPEG_DIR) {
   Get-ChildItem (Join-Path $env:FFMPEG_DIR 'share') -Filter copyright -Recurse |
     ForEach-Object { Copy-Item $_.FullName (Join-Path $Lic "$($_.Directory.Name).txt") }
 }
-# ort-sys's copy-dylibs used to drop DirectML.dll beside the binaries, but recent Rust
-# versions changed the build-script OUT_DIR layout (target/<triple>/release/build/ort-sys/<fp>/out),
-# so its hardcoded ancestors().nth(3) landed on release/build/ and the fallback fs::copy into the
-# nonexistent build\examples panicked (os error 3; upstream fix: pykeio/ort eed568160). The feature
-# is therefore off (crates/mediapipe/Cargo.toml) and we take the DLL straight from ort-sys's
-# download cache, which the cargo build above populated (dfbin\<target>\<dist hash>\DirectML.dll).
-$ortDist = Get-ChildItem (Join-Path $env:LOCALAPPDATA "ort.pyke.io\dfbin\$Target") -Directory -ErrorAction SilentlyContinue |
-  Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if ($ortDist -and (Test-Path (Join-Path $ortDist.FullName 'DirectML.dll'))) {
-  Copy-Item (Join-Path $ortDist.FullName 'DirectML.dll') $Bin
-} else {
-  throw "DirectML.dll not found in the ort-sys download cache ($env:LOCALAPPDATA\ort.pyke.io\dfbin\$Target\<dist>) — run the cargo build above first"
+$ort = $env:ONNXRUNTIME_DIR
+if (-not $ort) {
+  throw 'ONNXRUNTIME_DIR is not set — point it at the unpacked Microsoft.ML.OnnxRuntime.DirectML NuGet (its win-x64 runtime DLLs plus the licence texts); CI downloads it (build.yml)'
 }
-foreach ($dll in @('sherpa-onnx-c-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'DirectML.dll')) {
+foreach ($dll in @('onnxruntime.dll', 'onnxruntime_providers_shared.dll')) {
+  $src = Join-Path $ort $dll
+  if (-not (Test-Path $src)) { throw "ONNXRUNTIME_DIR is missing $dll" }
+  Copy-Item $src $Bin -Force
+}
+New-Item -ItemType Directory -Force -Path $Lic | Out-Null
+# The ORT licence texts ride along with the runtime (none are committed in-tree; the macOS
+# packaging falls back to packaging/OnnxRuntime-LICENSE.txt the same way).
+foreach ($text in @('LICENSE', 'ThirdPartyNotices.txt')) {
+  $src = Join-Path $ort $text
+  if (Test-Path $src) { Copy-Item $src (Join-Path $Lic "OnnxRuntime-$text") }
+}
+foreach ($dll in @('sherpa-onnx-c-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll')) {
   $src = Join-Path $Bin $dll
   if (-not (Test-Path $src)) { throw "build tree is missing $dll — was the build run with the ASR/face dependencies in place?" }
   Copy-Item $src $Stage
@@ -208,7 +214,7 @@ if ($env:CRAFT_FONTS_DIR) {
 # Assert what the ZIP is built from: a package without its DLLs installs cleanly and then dies at
 # launch ("sherpa-onnx-c-api.dll was not found") — exactly how these packages regressed. The
 # MSI's compiled file table is checked the same way by check-install-policy.ps1.
-foreach ($dll in @('sherpa-onnx-c-api.dll', 'onnxruntime.dll', 'DirectML.dll', 'vcruntime140.dll')) {
+foreach ($dll in @('sherpa-onnx-c-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'vcruntime140.dll')) {
   if (-not (Test-Path (Join-Path $Portable $dll))) { throw "the portable package is missing $dll" }
 }
 $Zip = Join-Path $Dist "filmcraft-$Version-windows-$Arch-portable.zip"

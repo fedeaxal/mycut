@@ -106,13 +106,13 @@ pub fn letterbox_params(
 /// 注：macOS 上 CoreML 在 Intel 核显机器实测远慢于 CPU（模型搬运开销 > 收益），
 /// Intel 目标的 ort 也不编译 coreml feature。Windows 请求 DirectML 的前提是
 /// 随包的 onnxruntime.dll 是 DirectML 版（CI 打包微软 DirectML NuGet 的
-/// 1.24.4——官方 DirectML 版 DLL 的最后一版；Apple Silicon 则是 ort 官方
-/// 预编译静态链接，CoreML EP 内置）。对 **CPU 版**运行时（如手放的微软
-/// GitHub release zip）请求 DirectML 不是优雅回退而是 0xC0000005 崩溃：
-/// 里面没有 DML EP，`GetExecutionProviderApi("DML")` 交回垃圾表指针，ort
-/// rc.13 拿它直接调 `SessionOptionsAppendExecutionProvider_DML2`（2026-11-11
-/// 排查的「进 Reaction 界面就崩」）。无 DX12/CoreML 设备时注册失败仍会
-/// 优雅回退 CPU。
+/// 1.24.4——官方 DirectML 版 DLL 的最后一版，DirectML 静态内链于
+/// onnxruntime.dll；Apple Silicon 是官方 dylib 1.23.2，CoreML EP 内置）。
+/// 对 **CPU 版**运行时（如手放的微软 GitHub release zip）请求 DirectML
+/// 不是优雅回退而是 0xC0000005 崩溃：里面没有 DML EP，
+/// `GetExecutionProviderApi("DML")` 交回垃圾表指针，ort rc.13 拿它直接调
+/// `SessionOptionsAppendExecutionProvider_DML2`（2026-11-11 排查的「进
+/// Reaction 界面就崩」）。无 DX12/CoreML 设备时注册失败仍会优雅回退 CPU。
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Ep {
     Auto,
