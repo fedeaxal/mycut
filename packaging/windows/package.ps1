@@ -132,9 +132,6 @@ foreach ($dll in @('sherpa-onnx-c-api.dll', 'onnxruntime.dll', 'onnxruntime_prov
   Copy-Item $src $Stage
 }
 New-Item -ItemType Directory -Force -Path $Lic | Out-Null
-Copy-Item (Join-Path $PSScriptRoot 'OnnxRuntime-LICENSE.txt') (Join-Path $Lic 'OnnxRuntime-LICENSE.txt')
-Copy-Item (Join-Path $PSScriptRoot 'sherpa-onnx-LICENSE.txt') (Join-Path $Lic 'sherpa-onnx-LICENSE.txt')
-Copy-Item (Join-Path $PSScriptRoot 'DirectML-LICENSE.txt') (Join-Path $Lic 'DirectML-LICENSE.txt')
 # The whole Microsoft.VC*.CRT folder rather than a list of file names: it is exactly the set
 # Microsoft redistributes together, and picking from it by hand is how an install ends up
 # missing vcruntime140_1.dll. Required by the /MD executables themselves, not just the DLLs.
