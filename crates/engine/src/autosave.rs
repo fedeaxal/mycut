@@ -506,8 +506,13 @@ pub fn portable_data_dir(exe_dir: &Path) -> Option<PathBuf> {
 
 /// The data directory. `FILMCRAFT_DATA_DIR` overrides; a portable install ([`PORTABLE_MARKER`] next
 /// to the executable) uses `<exe dir>/data`; otherwise the per-user directory:
-/// macOS `~/Library/Application Support/FilmCraft`, Windows `%APPDATA%\FilmCraft`,
-/// elsewhere `$XDG_DATA_HOME/filmcraft` or `~/.local/share/filmcraft`.
+/// macOS `~/Library/Application Support/Reacut`, Windows `%APPDATA%\Reacut`,
+/// elsewhere `$XDG_DATA_HOME/reacut` or `~/.local/share/reacut`.
+///
+/// These per-user paths were spelled `FilmCraft`/`filmcraft` before the app was renamed; the first
+/// start that finds the old directory and no new one renames it in place, so settings, logs, model
+/// caches and crash recovery carry over. Overrides and portable installs are exempt: the user chose
+/// those paths themselves.
 pub fn default_data_dir() -> Option<PathBuf> {
     let env = |k: &str| std::env::var_os(k).filter(|v| !v.is_empty()).map(PathBuf::from);
     if let Some(d) = env("FILMCRAFT_DATA_DIR") {
@@ -517,12 +522,45 @@ pub fn default_data_dir() -> Option<PathBuf> {
         return Some(d);
     }
     if cfg!(target_os = "macos") {
-        return env("HOME").map(|h| h.join("Library/Application Support/FilmCraft"));
+        return env("HOME").map(|h| {
+            let dir = h.join("Library/Application Support/Reacut");
+            migrate_legacy_data_dir(&dir, &h.join("Library/Application Support/FilmCraft"));
+            dir
+        });
     }
     if cfg!(windows) {
-        return env("APPDATA").map(|h| h.join("FilmCraft"));
+        return env("APPDATA").map(|h| {
+            let dir = h.join("Reacut");
+            migrate_legacy_data_dir(&dir, &h.join("FilmCraft"));
+            dir
+        });
     }
-    env("XDG_DATA_HOME").map(|d| d.join("filmcraft")).or_else(|| env("HOME").map(|h| h.join(".local/share/filmcraft")))
+    let migrated = |base: PathBuf, name: &str, legacy: &str| {
+        let dir = base.join(name);
+        migrate_legacy_data_dir(&dir, &base.join(legacy));
+        dir
+    };
+    env("XDG_DATA_HOME")
+        .map(|d| migrated(d, "reacut", "filmcraft"))
+        .or_else(|| env("HOME").map(|h| migrated(h.join(".local/share"), "reacut", "filmcraft")))
+}
+
+/// Rename the pre-rename data directory into place, once per process. Only acts when the new
+/// directory does not exist and the old one does; a failure (permissions, a file held open) is
+/// logged and the new directory starts empty — this may never block a start.
+fn migrate_legacy_data_dir(new: &Path, legacy: &Path) {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| migrate_legacy_data_dir_now(new, legacy));
+}
+
+fn migrate_legacy_data_dir_now(new: &Path, legacy: &Path) {
+    if new.exists() || !legacy.exists() {
+        return;
+    }
+    match std::fs::rename(legacy, new) {
+        Ok(()) => log::info!("migrated data directory {} -> {}", legacy.display(), new.display()),
+        Err(e) => log::warn!("could not migrate data directory {} -> {} ({e}); starting fresh", legacy.display(), new.display()),
+    }
 }
 
 pub fn unix_now() -> i64 {
@@ -606,7 +644,8 @@ pub fn scan_candidates(data_dir: &Path, skip: Option<&Path>) -> Vec<RecoveryCand
 
 /// Load a candidate's snapshot.
 pub fn load_candidate(c: &RecoveryCandidate) -> Result<filmcraft_format::Loaded, String> {
-    let b = fs::read(c.dir.join(SNAPSHOT)).map_err(|e| format!("{}: {e}", c.dir.display()))?;
+    let b = filmcraft_media::reader::read_regular_file_bounded(&c.dir.join(SNAPSHOT), filmcraft_format::MAX_PROJECT_BYTES)
+        .map_err(|e| format!("{}: {e}", c.dir.display()))?;
     filmcraft_format::decode(&b).map_err(|e| e.to_string())
 }
 
@@ -1298,5 +1337,33 @@ mod worker_failure_tests {
         assert!(s.is_dirty(), "auto-save should not mark the foreground project saved");
         s.shutdown();
         fs::remove_dir_all(dir).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod data_dir_migration_tests {
+    use super::migrate_legacy_data_dir_now;
+
+    #[test]
+    fn renames_a_legacy_directory_into_place_and_never_overwrites() {
+        let root = tempfile::tempdir().unwrap();
+        let new = root.path().join("Reacut");
+        let legacy = root.path().join("FilmCraft");
+        std::fs::create_dir_all(legacy.join("Logs")).unwrap();
+        std::fs::write(legacy.join("Logs/reacut.log"), "old session").unwrap();
+
+        migrate_legacy_data_dir_now(&new, &legacy);
+        assert!(new.join("Logs/reacut.log").is_file(), "the old tree moved wholesale");
+        assert!(!legacy.exists(), "no copy left behind");
+
+        // A second start: both gone / both present are no-ops, and the new tree is never touched.
+        migrate_legacy_data_dir_now(&new, &legacy);
+        assert_eq!(std::fs::read_to_string(new.join("Logs/reacut.log")).unwrap(), "old session");
+        let again = root.path().join("Reacut2");
+        let old = root.path().join("FilmCraft2");
+        std::fs::create_dir(&again).unwrap();
+        std::fs::create_dir(&old).unwrap();
+        migrate_legacy_data_dir_now(&again, &old);
+        assert!(again.is_dir() && old.is_dir(), "an existing data directory wins; the legacy one stays untouched");
     }
 }

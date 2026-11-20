@@ -1,23 +1,23 @@
 # Keyboard parity with Premiere Pro
 
-FilmCraft's **Premiere Pro Compatible** shortcut preset (Edit ▸ Keyboard Shortcuts…) follows
+Reacut's **Premiere Pro Compatible** shortcut preset (Edit ▸ Keyboard Shortcuts…) follows
 Premiere's default keyboard (macOS). The table lives in `crates/engine/src/shortcut_presets.rs`:
 `PREMIERE` (application-wide keys and a few panel keys) and `PREMIERE_PANEL` (panel-scoped keys
-that FilmCraft Default uses as well). `presets::premiere()` is the whole preset.
+that Reacut Default uses as well). `presets::premiere()` is the whole preset.
 
-Keyboard Shortcuts ▸ Export… / Import… write and read FilmCraft's own JSON preset files. An imported
+Keyboard Shortcuts ▸ Export… / Import… write and read Reacut's own JSON preset files. An imported
 file becomes a custom preset named after the set in it (or the file), with " (Imported)" added when
 that is a built-in preset's name, so an exported built-in set comes back as its own entry (#2489).
 Premiere's `.kys` files can't be imported yet: choosing one says so.
 
-Every entry names a FilmCraft command id. Engine commands run through `Session::execute`; UI
+Every entry names a Reacut command id. Engine commands run through `Session::execute`; UI
 commands (frames, panels, monitor zoom, Project and Text panel navigation) run through
-`menus::invoke`. Both are reachable by id from the CLI (`filmcraft-cli exec <id>`), the control
+`menus::invoke`. Both are reachable by id from the CLI (`reacut-cli exec <id>`), the control
 channel (`engine.execute` / `ui.menu.invoke`) and MCP (`command_run`).
 
 Tests: `crates/engine/src/keyboard_tests.rs` (no key used twice in one scope; behaviour of the
 keyboard commands, with undo) and `crates/ui-egui/tests/it/keyboard_ui.rs` (no dangling ids in the
-tables, no conflicts in FilmCraft Default or the Premiere preset, keys pressed in the headless app).
+tables, no conflicts in Reacut Default or the Premiere preset, keys pressed in the headless app).
 
 ## Keyboard-only commands (M3.12)
 
@@ -49,16 +49,16 @@ Paste Insert in the Timeline, the Audio Track Mixer Loop). The Audio Track Mixer
 Show/Hide Tracks… and Meter Input(s) Only are the commands `mixer.showHideTracks` and
 `mixer.meterInputOnly`, on Cmd+Alt+T and Ctrl+Shift+I with the Audio Track Mixer focused.
 
-FilmCraft Default keeps its own keys where they differ (Shift+E is Clip ▸ Enable there, so Export
+Reacut Default keeps its own keys where they differ (Shift+E is Clip ▸ Enable there, so Export
 Frame has no default key; the Premiere preset moves Shift+E to Export Frame and Enable to ⇧⌘E).
 
 ## Skipped Premiere default shortcuts
 
 | Premiere command (key, scope) | Reason |
 |---|---|
-| Generative Media Tool (⇧V) | Adobe Firefly cloud generation; not part of FilmCraft. |
-| Add to object / Subtract from object (⌘= / ⌘-) | Refine an AI object mask (Object Mask tool); FilmCraft has no AI object masks. |
-| Change Draw Mode (⌥⌘L) | Premiere's shape draw modes for the Pen/shape tools; FilmCraft's shape tools have no draw modes. |
+| Generative Media Tool (⇧V) | Adobe Firefly cloud generation; not part of Reacut. |
+| Add to object / Subtract from object (⌘= / ⌘-) | Refine an AI object mask (Object Mask tool); Reacut has no AI object masks. |
+| Change Draw Mode (⌥⌘L) | Premiere's shape draw modes for the Pen/shape tools; Reacut's shape tools have no draw modes. |
 | Production panel: New Project, New Folder, Close Project, Make a Copy, Move Selection Home/End/Page Up/Page Down, Move To Trash, Open Project, Zoom In/Out (12 keys) | Productions (shared multi-project folders) are not implemented; there is no Production panel. |
 | Search panel: Open in Source Monitor (⇧O) | No separate Search panel; Open Search (⇧⌘F) focuses the Project panel search. |
 | Effect Controls: Remove Selected Effect (Delete), Loop During Audio-Only Playback (⌘L) | Effect Controls has no effect selection state and no audio-only playback mode; effects are removed from their context menu or `effects.remove`. |
@@ -71,7 +71,7 @@ Frame has no default key; the Premiere preset moves Shift+E to Export Frame and 
 
 ## Numpad keys
 
-FilmCraft's shortcut engine runs on egui, which maps numpad digits to the same `Key::Num*` variants as the main keyboard row. This means **numpad digits cannot currently be bound independently** of their main-keyboard equivalents — binding `0` on the numpad binds `0` everywhere, and vice versa.
+Reacut's shortcut engine runs on egui, which maps numpad digits to the same `Key::Num*` variants as the main keyboard row. This means **numpad digits cannot currently be bound independently** of their main-keyboard equivalents — binding `0` on the numpad binds `0` everywhere, and vice versa.
 
 This is because egui reports numpad digits as the main-row digit keys (it does not expose distinct `Key::Numpad*` variants).
 

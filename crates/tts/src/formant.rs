@@ -29,7 +29,7 @@ pub struct VoiceSpec {
     pub breath: f32,
 }
 
-const LICENSE: &str = "Built into FilmCraft (project licence)";
+const LICENSE: &str = "Built into Reacut (project licence)";
 
 pub static VOICES: &[VoiceSpec] = &[
     VoiceSpec {

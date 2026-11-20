@@ -63,7 +63,7 @@ class InstallTests(unittest.TestCase):
             self.assertTrue((prefix / "share/mime/packages/test.xml").is_file())
             self.assertEqual(other.read_text(), "unrelated\n")
         desktop = prefix / "share/applications" / f"{APP_ID}.desktop"
-        self.assertIn(f'Exec="{prefix}/bin/filmcraft" %F\n', desktop.read_text())
+        self.assertIn(f'Exec="{prefix}/bin/reacut" %F\n', desktop.read_text())
         if shutil.which("desktop-file-validate"):
             subprocess.run(["desktop-file-validate", str(desktop)], check=True)
 
@@ -79,11 +79,11 @@ class InstallTests(unittest.TestCase):
         launched = prefix / "bin/launched"
         for _ in range(100):
             if launched.exists() and launched.read_text().splitlines() == [
-                str(prefix / "bin/filmcraft"), str(document)
+                str(prefix / "bin/reacut"), str(document)
             ]:
                 break
             time.sleep(0.01)
-        self.assertEqual(launched.read_text().splitlines(), [str(prefix / "bin/filmcraft"), str(document)])
+        self.assertEqual(launched.read_text().splitlines(), [str(prefix / "bin/reacut"), str(document)])
 
     def test_invalid_arguments_fail_before_writing(self):
         for args in (("--prefix",), ("--prefix", "relative"), ("--prefix", "/"), ("--unknown",),
@@ -96,7 +96,7 @@ class InstallTests(unittest.TestCase):
                 self.assertNotEqual(self.install(*args).returncode, 0)
 
     def test_incomplete_bundle_does_not_install(self):
-        (self.bundle / "bin/filmcraft-cli").unlink()
+        (self.bundle / "bin/reacut-cli").unlink()
         prefix = self.root / "destination"
         result = self.install("--prefix", prefix)
         self.assertNotEqual(result.returncode, 0)

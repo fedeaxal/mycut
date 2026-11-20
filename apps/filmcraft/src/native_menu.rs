@@ -63,7 +63,7 @@ pub fn install(app: &FilmcraftApp, ctx: egui::Context) -> (Receiver<String>, Men
     let mut native: Vec<(Item, MenuItem)> = Vec::new();
     let mut titles: Vec<(String, Submenu)> = Vec::new();
     let bar = Menu::new();
-    let app_menu = Submenu::new("FilmCraft", true);
+    let app_menu = Submenu::new("Reacut", true);
     let [settings_label, hide_label, hide_others_label, quit_label] = NATIVE_APP_MENU;
     // FilmCraft ▸ Settings ▸ <category> (Premiere's app-menu layout; General is Cmd+,)
     let settings = Submenu::new(app.ui.language.tr(settings_label), true);
@@ -76,7 +76,7 @@ pub fn install(app: &FilmcraftApp, ctx: egui::Context) -> (Receiver<String>, Men
     }
     // About lives only in this app menu (the Help menu ships empty): its label is translated
     // directly, since no Help-menu command carries it any more, and retranslated on a switch.
-    let about = MenuItem::with_id("app.about", app.ui.language.tr("About FilmCraft"), true, None);
+    let about = MenuItem::with_id("app.about", app.ui.language.tr("About Reacut"), true, None);
     // the predefined items keep their native actions; our text lets them follow the language
     let predefined = [
         (hide_label, PredefinedMenuItem::hide(Some(app.ui.language.tr(hide_label)))),
@@ -150,8 +150,8 @@ pub fn install(app: &FilmcraftApp, ctx: egui::Context) -> (Receiver<String>, Men
         if use_native == native_shown.get() {
             return Ok(());
         }
-        let regular = edit_menu.as_ref().ok_or("FilmCraft Edit menu is unavailable")?;
-        let index = MENUS.iter().position(|top| *top == "Edit").ok_or("FilmCraft Edit menu is unavailable")? + 1;
+        let regular = edit_menu.as_ref().ok_or("Reacut Edit menu is unavailable")?;
+        let index = MENUS.iter().position(|top| *top == "Edit").ok_or("Reacut Edit menu is unavailable")? + 1;
         let (old, new) = if use_native { (regular, &color_edit) } else { (&color_edit, regular) };
         menu_bar.insert(new, index).map_err(|e| e.to_string())?;
         if let Err(error) = menu_bar.remove(old) {
@@ -218,7 +218,7 @@ pub fn install(app: &FilmcraftApp, ctx: egui::Context) -> (Receiver<String>, Men
             for (title, submenu) in &titles {
                 submenu.set_text(language.tr(title));
             }
-            about.set_text(language.tr("About FilmCraft"));
+            about.set_text(language.tr("About Reacut"));
         }
         native_edit.set_text(language.tr("Edit"));
         for (label, item) in &text_items {

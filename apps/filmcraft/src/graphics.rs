@@ -161,7 +161,7 @@ fn failure_message_for(error: &str, failed: &[(Mode, String)], log: Option<&Path
             None => text.to_string(),
         }
     };
-    let mut msg = format!("FilmCraft could not start its window: {}\n", shorten(error));
+    let mut msg = format!("Reacut could not start its window: {}\n", shorten(error));
     if !failed.is_empty() {
         msg.push_str("\nGraphics modes tried:\n");
         for (mode, err) in failed {
@@ -171,9 +171,9 @@ fn failure_message_for(error: &str, failed: &[(Mode, String)], log: Option<&Path
     msg.push_str("\nUpdating the graphics driver usually fixes this.");
     if ladder.len() > 1 {
         let names: Vec<String> = ladder.iter().map(|m| format!("--graphics {}", m.name())).collect();
-        msg.push_str(&format!(" To choose a graphics mode yourself, start FilmCraft with {}.", names.join(", ")));
+        msg.push_str(&format!(" To choose a graphics mode yourself, start Reacut with {}.", names.join(", ")));
     }
-    msg.push_str(&format!("\n\nFilmCraft {} ({} {})", env!("CARGO_PKG_VERSION"), std::env::consts::OS, std::env::consts::ARCH));
+    msg.push_str(&format!("\n\nReacut {} ({} {})", env!("CARGO_PKG_VERSION"), std::env::consts::OS, std::env::consts::ARCH));
     if let Some(log) = log {
         msg.push_str(&format!("\nDetails are in {}", log.display()));
     }

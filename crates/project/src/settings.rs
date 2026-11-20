@@ -84,7 +84,7 @@ pub enum IngestAction {
 impl Default for ProjectSettings {
     fn default() -> Self {
         Self {
-            renderer: "FilmCraft GPU Acceleration (wgpu)".into(),
+            renderer: "Reacut GPU Acceleration (wgpu)".into(),
             video_display: filmcraft_time::TimeDisplay::Timecode,
             audio_display_samples: true,
             default_still_duration: Tick(5 * TICKS_PER_SECOND),

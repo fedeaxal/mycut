@@ -296,6 +296,10 @@ pub struct FilmcraftApp {
     pub(crate) pending_panel_raise: Option<PanelKind>,
     /// Explicit automation mode: native widget input and native menu commands are excluded.
     pub(crate) control_input_only: bool,
+    /// Set while a control-channel `engine.execute` runs: a command whose menu form opens a
+    /// dialog to ask for parameters runs the engine command instead (an agent cannot see or
+    /// close a dialog; `ui.menu.invoke` keeps the menu behaviour, #1540).
+    pub(crate) engine_call: bool,
     /// Backend focus before synthetic input changes egui's effective focus for this frame.
     pub(crate) native_window_focused: Option<bool>,
     /// Modifiers owned by an in-flight control gesture, carried between its input frames.
@@ -432,6 +436,14 @@ pub struct FilmcraftApp {
     pub(crate) stale_clipboard_media: Option<String>,
     /// GPU compositor (when running on wgpu): device state + compositor + the egui texture it feeds.
     pub gpu: Option<GpuState>,
+    /// The eframe wgpu device the window renders with, kept even when the GPU
+    /// compositor is off: a machine whose only adapter is a software
+    /// rasterizer (WARP) has `gpu = None` — the editor composites on the CPU
+    /// — and the embedded Reaction page still needs this device for its own
+    /// engine, which pairs its D3D11 stack with whatever adapter this is on
+    /// (see `panels::reaction` and `engine::backend`). Without it that page
+    /// has no engine at all, and nothing added to its canvas ever shows.
+    pub wgpu_render_state: Option<eframe::egui_wgpu::RenderState>,
     /// Preview render job being watched (job id, where to start playing when it completes).
     watched_render: Option<(u64, Tick)>,
     /// The status bar's running-job text as last shown.

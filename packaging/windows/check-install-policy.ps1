@@ -353,7 +353,7 @@ try {
       if ((Test-ControlVisible $text) -ne ($scope -eq '1')) { throw 'The welcome-page scope text must follow the selected scope.' }
     }
   }
-  if ($policy.id -in 'deckcraft','filmcraft','soundcraft') {
+  if ($policy.id -in 'deckcraft','reacut','soundcraft') {
     foreach ($route in @(@('WelcomeDlg','Next','InstallDirDlg'),@('InstallDirDlg','Back','WelcomeDlg'))) {
       $dialog = $route[0]; $control = $route[1]
       $routes = @(Read-Rows $database "SELECT ``Argument``, ``Condition`` FROM ``ControlEvent`` WHERE ``Dialog_`` = '$dialog' AND ``Control_`` = '$control' AND ``Event`` = 'NewDialog' ORDER BY ``Ordering``" 2)

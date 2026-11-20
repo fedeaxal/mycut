@@ -212,12 +212,12 @@ impl Default for GraphicsTemplate {
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum TemplateError {
     #[error(
-        "this file is a ZIP archive (an Adobe .mogrt or another application's package?): FilmCraft does not read motion graphics templates from other applications, only its own .fcgt graphics templates"
+        "this file is a ZIP archive (an Adobe .mogrt or another application's package?): Reacut does not read motion graphics templates from other applications, only its own .fcgt graphics templates"
     )]
     ForeignPackage,
-    #[error("not a FilmCraft graphics template: {0}")]
+    #[error("not a Reacut graphics template: {0}")]
     NotTemplate(String),
-    #[error("this graphics template was made by a newer FilmCraft (format version {0}; this build reads up to {TEMPLATE_VERSION})")]
+    #[error("this graphics template was made by a newer Reacut (format version {0}; this build reads up to {TEMPLATE_VERSION})")]
     TooNew(u32),
     #[error("invalid graphics template: {0}")]
     Invalid(String),
@@ -465,7 +465,7 @@ fn builtin(
         name: name.into(),
         category: category.into(),
         description: description.into(),
-        author: "FilmCraft contributors".into(),
+        author: "Reacut contributors".into(),
         license: "MIT OR Apache-2.0".into(),
         tags: vec![category.to_ascii_lowercase()],
         duration: Tick(seconds * TICKS_PER_SECOND),

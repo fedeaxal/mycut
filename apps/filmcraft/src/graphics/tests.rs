@@ -447,12 +447,12 @@ fn the_failure_message_lists_each_mode_how_to_choose_one_and_the_log() {
         (Mode::Default, "Adapter selection failed: no adapter".to_string()),
         (Mode::Software, "no software graphics adapter (WARP, lavapipe, llvmpipe) among 3 adapters".to_string()),
     ];
-    let log = PathBuf::from("/data/Logs/filmcraft.log");
+    let log = PathBuf::from("/data/Logs/reacut.log");
     let msg = failure_message_for("wgpu error: no software graphics adapter", &failed, Some(&log), LINUX);
-    assert!(msg.starts_with("FilmCraft could not start its window: wgpu error"), "{msg}");
+    assert!(msg.starts_with("Reacut could not start its window: wgpu error"), "{msg}");
     assert!(msg.contains("• default graphics (--graphics default): Adapter selection failed: no adapter"), "{msg}");
     assert!(msg.contains("• software rendering (--graphics software): no software graphics adapter"), "{msg}");
-    assert!(msg.contains("start FilmCraft with --graphics default, --graphics low-power, --graphics software."), "{msg}");
+    assert!(msg.contains("start Reacut with --graphics default, --graphics low-power, --graphics software."), "{msg}");
     assert!(msg.contains(env!("CARGO_PKG_VERSION")), "{msg}");
     assert!(msg.contains(&log.display().to_string()), "{msg}");
     // macOS has one mode: no choice to offer, and no list when nothing was tried

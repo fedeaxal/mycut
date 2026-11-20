@@ -6,7 +6,7 @@ and `.md` (options and sections: [testing.md](testing.md) §5). Agents read live
 
 ## Interactive builds and redraw work
 
-For interactive editing, build with `cargo build --release -p filmcraft --features whisper` and
+For interactive editing, build with `cargo build --release -p reacut --features whisper` and
 launch `target/release/filmcraft`. The development profile optimizes dependencies and codec hot
 loops, but still builds the editor at optimization level 1; it is not the release performance
 baseline. Keep the same build profile when comparing code changes.
@@ -19,7 +19,7 @@ search highlights by query. Playhead movement reuses them; project edits, undo/r
 refresh them. Highlight lookup is constant work per word, including searches with many matches.
 
 To measure a long transcript, run
-`cargo test -p filmcraft-ui-egui --test it transcript_ui::long_transcript_redraw_benchmark -- --ignored --nocapture`
+`cargo test -p reacut-ui-egui --test it transcript_ui::long_transcript_redraw_benchmark -- --ignored --nocapture`
 alone. It reports median and p95 redraw time for 10,000 words with an empty query and a query matching
 every word. It measures UI update work, not native display presentation, and deliberately has no
 machine-dependent timing assertion. The transcript still lays out every word; list virtualization
@@ -98,7 +98,7 @@ Apple M2 Max (12 cores, 64 GB, macOS 26.6), 2026-10-23, a shared machine with ot
 builds running (1-minute load average 57–170 across the runs, noted per pair). The timeline is
 the #3030 shape: 60 s 1080p23.976 sequence, a 1080p H.264 clip on V1, a 4K H.264 clip on V2 as a
 40 % picture-in-picture, stereo WAV on A1 (ffmpeg `testsrc2` + noise fixtures), exported to
-H.264 20 Mb/s + AAC through `filmcraft-cli … run`, hardware decoding on. Before / after binaries
+H.264 20 Mb/s + AAC through `reacut-cli … run`, hardware decoding on. Before / after binaries
 alternated (A/B/A/B/A/B), median of three; `convert`, `encode`, `render`, `wait` are the export's
 own stage timers (render overlaps encode, so they do not add up to the wall time).
 
@@ -152,7 +152,7 @@ path scores 24–29 dB) and not a range or matrix difference. On smooth content 
 37 dB and 0.2 / 0.6 / 0.8 codes).
 
 Sessions: under LLDB with auto-continuing breakpoints on `VTCompressionSessionCreate` and
-`VTCompressionSessionInvalidate`, two consecutive exports in one `filmcraft-cli run` created 3
+`VTCompressionSessionInvalidate`, two consecutive exports in one `reacut-cli run` created 3
 sessions (the HEVC availability probe and one per export) and invalidated every one (6 hits: ours
 and the framework's at release); the test that exports at other frame rates, cancels an export
 from another thread and exports again created 6 and invalidated 12.
@@ -160,7 +160,7 @@ from another thread and exports again created 6 and invalidated 12.
 ## Results (CPU compositor: layer rectangles, an opaque bottom layer and recycled images, before → after)
 
 The CPU compositor is what export runs. In a profile of a 9:29 export it took about a third of the
-busy CPU with the built-in H.264 encoder (the encoder took the other two thirds), and a faster
+busy CPU with the software H.264 encoder (the encoder took the other two thirds), and a faster
 encoder leaves it as the largest cost of an export. It works on premultiplied linear `f32` images,
 33 MB each at 1080p, and every layer was one of them: a banner that is transparent except for its
 bottom 100 rows still cost a full conversion and a full mix, and the bottom layer paid for a
@@ -171,7 +171,7 @@ two builds ran alternately in the same session and the median is reported.
 
 ### Per frame, synthetic 1080p sources
 
-`cargo run --release -p filmcraft-render --example frame_bench`: an 8-bit 4:2:0 camera picture and a
+`cargo run --release -p reacut-render --example frame_bench`: an 8-bit 4:2:0 camera picture and a
 10-bit 4:4:4 banner with alpha only in its bottom 100 rows; `render_sequence` followed by the
 conversion to 8-bit RGBA, milliseconds per frame (median of 40 frames, 5 alternating rounds):
 
@@ -261,8 +261,8 @@ so Export ▸ GPU Rendering did nothing for the frames under one. A full-frame a
 100 % opacity, Normal, unmasked and with only GPU effects is now a `PlanStep::Adjust`: its effects
 run in the GPU effect stage on the composite of the tracks below. Windows 11 Pro 26300, Xeon
 E5-2680 v4 (14 cores / 28 threads), RTX 5060 8 GB (driver 617.14), 2026-10-23, release builds of
-main 20f02b9a and of the change with `cargo build --release -p filmcraft -p filmcraft-cli`, two
-alternating rounds, `filmcraft-cli … run` of `file.exportMedia` (H.264, `gpuRendering` and
+main 20f02b9a and of the change with `cargo build --release -p reacut -p reacut-cli`, two
+alternating rounds, `reacut-cli … run` of `file.exportMedia` (H.264, `gpuRendering` and
 `hardwareEncoding` Auto, NVENC), 300 frames of a 1920×1080 30 fps sequence, seconds:
 
 | scene | main | **after** |
@@ -372,7 +372,7 @@ and an outro.
 
 | encoder | wall time | frames/s | vs real time | file |
 |---|---|---|---|---|
-| built-in (`filmcraft-h264enc`) | 793 s | 17.9 | 1.4× slower | 1445 MB, 20.0 Mb/s |
+| Reacut software encoder (pre-cutover local implementation) | 793 s | 17.9 | 1.4× slower | 1445 MB, 20.0 Mb/s |
 | hardware (VideoToolbox) | **311 s** | **45.7** | 1.8× faster | 1417 MB, 19.6 Mb/s |
 
 2.5× faster. The first 134 s of the same timeline, where the overlays are densest (intro, a banner, a
@@ -380,7 +380,7 @@ subscribe bar and the outro in 134 s):
 
 | encoder | wall time | frames/s | vs real time | file |
 |---|---|---|---|---|
-| built-in (`filmcraft-h264enc`) | 395 s | 8.5 | 2.9× slower | 340 MB, 20.0 Mb/s |
+| Reacut software encoder (pre-cutover local implementation) | 395 s | 8.5 | 2.9× slower | 340 MB, 20.0 Mb/s |
 | hardware (VideoToolbox) | **84 s** | **39.9** | 1.6× faster | 312 MB, 18.3 Mb/s |
 
 4.7× faster there. The gain depends on what else an export spends its time on: with the encoder
@@ -499,7 +499,7 @@ while it runs. A monitor playing a different file than the export dropped no fra
 
 ## Results (CPU H.264 export: encoder work and colour conversion, before → after)
 
-`cargo run --release -p filmcraft-engine --example bench_export -- --runs 1`: 10 s of 1080p23.976
+`cargo run --release -p reacut-engine --example bench_export -- --runs 1`: 10 s of 1080p23.976
 H.264 + AAC (ffmpeg `testsrc2` with noise) exported to H.264 + AAC MP4 on the CPU (software
 encoder, no GPU renderer). Ryzen, 16 threads, Linux, 2026-10-27; 7 rounds with the builds in
 rotating order, one export per run, wall time in seconds:
@@ -535,7 +535,7 @@ compositor and the decoders, not by the encoder, so a different hardware codec d
 
 ### Quality per bit
 
-30 s with a banner (15–45 s of that timeline), exported by FilmCraft as ProRes 422 HQ (the reference)
+30 s with a banner (15–45 s of that timeline), exported by Reacut as ProRes 422 HQ (the reference)
 and by each encoder at several bitrates; ffmpeg's `psnr` and `ssim` of the decoded 4:2:0 pictures against
 the reference. Average PSNR over the three planes, and SSIM (higher is better):
 
@@ -726,7 +726,7 @@ one thread the code path is the old one.
 
 Linux, AMD Ryzen 7 7800X3D (8 cores / 16 threads), 2026-10-11, shared with other agents' builds;
 base = `2ff3f5e`, after = this change, 16 decoder threads, SVT-AV1 preset 8 fixtures from
-`crates/av1/tests/it/perf.rs` (`perf_1080p_lowdelay` and `perf_2160p_gop` are new there).
+craft-libs `crates/video/tests/av1_decode/perf.rs` (`perf_1080p_lowdelay` and `perf_2160p_gop` are new there).
 
 `av1dec` example (`AV1_LOOPS=2 AV1_THREADS=16`), 8 rounds alternating base / after per fixture,
 load average 11–27; speed-up = base wall time / after wall time of the adjacent pair:
@@ -948,7 +948,7 @@ round). On an idle machine the 4K clip needs about two cores.
    all threads (bit-exact each time). A separate deblocking thread was not added: a picture's rows
    are published about two rows after they are reconstructed, so a reference chain advances a few
    rows behind its predecessor and the pool already has more pictures in flight than cores
-   (crates/h264/README.md, "Threading model").
+   (craft-libs `crates/video/src/h264/decode/README.md`, "Threading model").
 5. **Draft decoding** (Settings ▸ Playback ▸ Draft decoding, off by default; `perf.stats`
    `playback.draftDecode`, `decode.draftFrames`, `decode.h264Threads`): while the Program monitor
    plays at 1/2 or 1/4, H.264 non-reference pictures skip deblocking (no other picture can change),

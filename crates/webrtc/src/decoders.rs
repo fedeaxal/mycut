@@ -2,12 +2,12 @@
 // SPDX-FileCopyrightText: 2026 Jareer and Reacut contributors
 
 //! The phone's decoders, over the studio's own clean-room codecs — the same
-//! `filmcraft-h264` and `craft-audio` the editor ships, so a phone camera
-//! adds no second codec stack. Push decoders both: the session thread hands
-//! one access unit (or one Opus packet) in, and finished pictures come back
-//! out.
+//! `craft-video` (H.264) and `craft-audio` (Opus) the editor ships, so a phone
+//! camera adds no second codec stack. Push decoders both: the session thread
+//! hands one access unit (or one Opus packet) in, and finished pictures come
+//! back out.
 //!
-//! H.264 in software, multithreaded (`filmcraft-h264`'s `threads` feature):
+//! H.264 in software, multithreaded (`craft-video`'s `threads` feature):
 //! a phone's 720p stream is a light load, and the output arrives as plain
 //! 4:2:0 planes — exactly what the studio's NV12 upload wants, with no
 //! colour conversion anywhere on this path.
@@ -15,7 +15,7 @@
 use std::sync::{Arc, Mutex};
 
 use craft_audio::opus::StreamDecoder;
-use filmcraft_h264::Decoder as H264Decoder;
+use craft_video::h264::decode::Decoder as H264Decoder;
 
 use crate::{DecodedPicture, VideoSink};
 
@@ -104,7 +104,7 @@ impl MediaH264Decoder {
     }
 
     /// One decoded picture → the sink, planes as they came out.
-    fn emit(&mut self, picture: filmcraft_h264::Picture) {
+    fn emit(&mut self, picture: craft_video::h264::decode::Picture) {
         let (width, height) = (picture.width, picture.height);
         if width == 0 || height == 0 {
             return;
@@ -130,9 +130,9 @@ impl MediaH264Decoder {
             self.video.size_published(width, height);
         }
         // 每 150 帧报一次投递速率：静帧时区分"解码停了"和"投递后停了"。
-        let emitted = EMITTED.fetch_add(1, Ordering::Relaxed) + 1;
-        // if emitted % 150 == 0 {
-        //     log::info!("phone video: {emitted} frames decoded and delivered");
+        let _emitted = EMITTED.fetch_add(1, Ordering::Relaxed) + 1;
+        // if _emitted % 150 == 0 {
+        //     log::info!("phone video: {_emitted} frames decoded and delivered");
         // }
         self.video.send(DecodedPicture {
             width,

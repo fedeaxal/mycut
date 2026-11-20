@@ -1,6 +1,6 @@
 # Captions
 
-FilmCraft keeps captions on **caption tracks** in the sequence, shown in their own area above the
+Reacut keeps captions on **caption tracks** in the sequence, shown in their own area above the
 video tracks (as Premiere does). Caption tracks are saved in the `.fcproj` (project format
 version 2; version 1 projects open with no caption tracks).
 
@@ -44,7 +44,7 @@ format from `format` or from the file extension. Its result's `warnings` names e
 cannot carry: SCC and MCC drop the ones CEA-608 has no code for (such as …) or send a close one
 (’ as '), and the CEA-708 service in MCC sends `?` for the ones it has no code for (such as —).
 
-Details of each format and the SCC encoder are in [`crates/captions/README.md`](../crates/captions/README.md).
+Details of each format and the SCC encoder are in craft-libs' [`crates/captions/README.md`](https://github.com/storytold/craft-libs/blob/main/crates/captions/README.md); Reacut's side (track mapping, burn-in) is in [`crates/captions/README.md`](../crates/captions/README.md).
 
 ## Editing
 

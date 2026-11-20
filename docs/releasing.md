@@ -1,12 +1,12 @@
-# Releasing FilmCraft
+# Releasing Reacut
 
 Every push to the `release` branch runs `.github/workflows/release.yml`. The workflow builds
 installers for macOS, Windows, Linux (AppImage, deb, rpm, tarball, Flatpak) and FreeBSD, plus
 the web build, and creates or updates a **draft**
-GitHub Release named `FilmCraft v<version>`. Nobody sees a draft until a maintainer publishes it.
+GitHub Release named `Reacut v<version>`. Nobody sees a draft until a maintainer publishes it.
 
-User-facing names say **FilmCraft**. Files, binaries and ids stay lowercase
-(`filmcraft-<version>-<platform>-<arch>.<ext>`, `ai.storyteller.filmcraft`).
+User-facing names say **Reacut**. Files, binaries and ids stay lowercase
+(`reacut-<version>-<platform>-<arch>.<ext>`, `ai.storyteller.filmcraft`).
 
 ## Cutting a release
 
@@ -19,10 +19,10 @@ User-facing names say **FilmCraft**. Files, binaries and ids stay lowercase
    ```
 
    Commit the change (`Cargo.toml` + `Cargo.lock`) through the normal review flow, as a
-   `Release: FilmCraft v0.3.0` commit whose message says what changed for users.
+   `Release: Reacut v0.3.0` commit whose message says what changed for users.
 2. **Merge `main` into `release`** (or fast-forward it) and push. The workflow starts by itself.
 3. **Wait for the draft.** When every job is done (macOS notarization is the slow part), the
-   Releases page has a draft `FilmCraft v0.3.0`, targeting the pushed commit, with every artifact
+   Releases page has a draft `Reacut v0.3.0`, targeting the pushed commit, with every artifact
    and `SHA256SUMS.txt`. The notes are generated from the merged pull requests.
 4. **Check it.** Download an installer or two and read the job summaries. A `::warning::` there
    means a signing secret was missing and that artifact is unsigned.
@@ -44,7 +44,7 @@ signing jobs are refused, and the draft-release job, which needs them, is skippe
 
 | Platform | Artifacts | Built on |
 |---|---|---|
-| macOS 11+ (universal: Apple silicon and Intel) | `filmcraft-<v>-macos-universal.dmg`, `filmcraft-cli-<v>-macos-universal.zip` | `macos-15` |
+| macOS 11+ (universal: Apple silicon and Intel) | `filmcraft-<v>-macos-universal.dmg`, `reacut-cli-<v>-macos-universal.zip` | `macos-15` |
 | Windows x64 | `filmcraft-<v>-windows-x64.msi`, `filmcraft-<v>-windows-x64-portable.zip` | `windows-latest` |
 | Windows x86 (32-bit) | `filmcraft-<v>-windows-x86.msi`, `filmcraft-<v>-windows-x86-portable.zip` | `windows-latest` |
 | Windows on ARM64 | `filmcraft-<v>-windows-arm64.msi`, `filmcraft-<v>-windows-arm64-portable.zip` | `windows-latest` (cross-compiled) |
@@ -56,7 +56,7 @@ signing jobs are refused, and the draft-release job, which needs them, is skippe
 | FreeBSD 14 x86_64 | `filmcraft-<v>-freebsd-x86_64.tar.gz` | FreeBSD 14.3 VM on `ubuntu-latest` |
 | Web | `filmcraft-web-<v>.zip`, a static site (see [`packaging/web/README.md`](../packaging/web/README.md)) | `ubuntu-latest` |
 
-`filmcraft --version` and `filmcraft-cli --version` print the version from `Cargo.toml`.
+`filmcraft --version` and `reacut-cli --version` print the version from `Cargo.toml`.
 
 **Fonts.** Every build job checks out [craft-fonts](https://github.com/storytold/craft-fonts) at a
 pinned commit (`craft-fonts-ref` in `.github/workflows/release.yml` and `freebsd.yml`) and builds
@@ -68,7 +68,7 @@ deliberately, in every job at once.
 ### macOS
 
 `packaging/macos/package.sh` builds `aarch64-apple-darwin` and `x86_64-apple-darwin` with
-`MACOSX_DEPLOYMENT_TARGET=11.0`, joins them with `lipo` and assembles `FilmCraft.app`:
+`MACOSX_DEPLOYMENT_TARGET=11.0`, joins them with `lipo` and assembles `Reacut.app`:
 
 - `Info.plist` is generated from `Info.plist.in` (bundle id `ai.storyteller.filmcraft`, the
   version and the build commit).
@@ -77,9 +77,9 @@ deliberately, in every job at once.
   `packaging/macos/import-cert.sh`.
 - **Notarization:** the app is sent with `xcrun notarytool submit`, then the ticket is stapled
   and checked with `stapler validate`. The app goes on a DMG (`hdiutil makehybrid`), which is
-  signed and notarized too. The universal `filmcraft-cli` is signed the same way, zipped, and the zip is notarized.
+  signed and notarized too. The universal `reacut-cli` is signed the same way, zipped, and the zip is notarized.
   Its Finder window (background, icon size and positions) comes from
-  [`packaging/macos/dmg/`](../packaging/macos/dmg/README.md), and its volume is named `FilmCraft`
+  [`packaging/macos/dmg/`](../packaging/macos/dmg/README.md), and its volume is named `Reacut`
   without the version, which the window's background needs; the DMG file name keeps the version.
 
 Locally, without certificates, the script signs ad hoc and skips notarization, which is enough to
@@ -90,13 +90,13 @@ check the bundle and the DMG on your own Mac (`packaging/macos/package.sh`).
 `packaging/windows/package.ps1 -Arch x64|x86|arm64` builds with `+crt-static`, so neither the MSI
 nor the portable zip needs the Visual C++ redistributable.
 
-- `filmcraft.wxs` (WiX) is a dual-scope package: per-user by default into
-  `%LOCALAPPDATA%\Programs\ArtCraft\FilmCraft`, per-machine into `Program Files\ArtCraft\FilmCraft` (`Program Files (x86)` for the 32-bit build)
+- `reacut.wxs` (WiX) is a dual-scope package: per-user by default into
+  `%LOCALAPPDATA%\Programs\ArtCraft\Reacut`, per-machine into `Program Files\ArtCraft\Reacut` (`Program Files (x86)` for the 32-bit build)
   (see `packaging/windows/INSTALLATION.md`). It has a Start Menu shortcut and
   an App Paths entry (Win+R `filmcraft`). Same-version upgrades are allowed, so release candidates
   replace each other.
 - The ARM64 build is cross-compiled on the x64 runner. `.github/workflows/windows-arm64.yml`
-  installs that MSI on a Windows 11 ARM64 runner, runs `filmcraft-cli --version` natively and
+  installs that MSI on a Windows 11 ARM64 runner, runs `reacut-cli --version` natively and
   uninstalls.
 - **Signing:** `packaging/windows/sign.ps1` signs the executables and then the `.msi` with
   `signtool`, using whichever material is present: a `.pfx` certificate (`WINDOWS_CERTIFICATE`,
@@ -137,13 +137,13 @@ release. The job checks both with `--appimage-updateinformation` and `test -s`.
 `packaging/linux/flatpak-bundle.sh` on the Linux job's tarball: it installs the binaries with
 `packaging/linux/flatpak/ai.storyteller.filmcraft.bundle.yml` into a single-file bundle,
 `filmcraft-<v>-linux-<arch>.flatpak` (no Rust build, so it takes a minute), then installs it and
-runs `filmcraft-cli --version` in the sandbox. Users install it with
+runs `reacut-cli --version` in the sandbox. Users install it with
 `flatpak install --user <file>`; the freedesktop runtime comes from Flathub.
 `packaging/linux/flatpak/ai.storyteller.filmcraft.yml` is the from-source manifest for a Flathub
 submission (its header says how to build it). Both manifests must keep the same runtime and
-`finish-args`, and install the same programs: the app and `filmcraft-cli`, which runs the
+`finish-args`, and install the same programs: the app and `reacut-cli`, which runs the
 headless commands and the MCP server in the sandbox
-(`flatpak run --command=filmcraft-cli ai.storyteller.filmcraft mcp`). packaging-lint checks this.
+(`flatpak run --command=reacut-cli ai.storyteller.filmcraft mcp`). packaging-lint checks this.
 
 ### FreeBSD
 
@@ -166,7 +166,7 @@ the crate's version exactly, `WASM_BINDGEN` in `xtask/src/main.rs`) and zips the
 ## The draft release
 
 The last job waits for every build, downloads their artifacts, writes `SHA256SUMS.txt` and creates
-the draft `FilmCraft v<version>` with notes generated from the merged pull requests. If the draft
+the draft `Reacut v<version>` with notes generated from the merged pull requests. If the draft
 already exists, it replaces its assets and keeps it a draft. If that version is already published,
 the job fails and asks for a version bump (`cargo xtask version set`).
 

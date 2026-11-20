@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 /// `filmcraft --help`.
 pub const USAGE: &str = "\
-Usage: filmcraft [options] [project.fcproj | media files...]
+Usage: reacut [options] [project.fcproj | media files...]
 
 Options:
   --control <port>   start the localhost JSON-lines control server

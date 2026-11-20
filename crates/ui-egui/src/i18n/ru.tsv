@@ -3,7 +3,7 @@
 # Full interface coverage: every string of the reference catalog is translated into Russian with
 # ordinary video-editing vocabulary. Clean-room: written from the plain meaning of the English
 # text; no proprietary localization resource, string table or product interface was consulted.
-	About FilmCraft	О FilmCraft
+	About Reacut	О Reacut
 	Add Audio Submix Track	Добавить дорожку подмикширования аудио
 	Add Caption at Playhead	Добавить субтитр в позиции курсора
 	Add Chapter Marker…	Добавить маркер главы…
@@ -122,9 +122,9 @@
 	File	Файл
 	File…	Файл…
 	Fill frame	Заполнить кадр
-	FilmCraft Help…	Справка FilmCraft…
-	FilmCraft on GitHub	FilmCraft на GitHub
-	FilmCraft on getartcraft.com	FilmCraft на getartcraft.com
+	Reacut Help…	Справка Reacut…
+	Reacut on GitHub	Reacut на GitHub
+	Reacut on getartcraft.com	Reacut на getartcraft.com
 	Find Next	Найти далее
 	Find…	Найти…
 	Fit	Вписать
@@ -297,7 +297,7 @@
 	Select Previous Graphic	Выбрать предыдущий графический элемент
 	Select Previous Layer	Выбрать предыдущий слой
 	Selection Follows Playhead	Выделение следует за курсором воспроизведения
-	Selection as FilmCraft Project…	Выделение как проект FilmCraft…
+	Selection as Reacut Project…	Выделение как проект Reacut…
 	Selection…	Выделение…
 	Send Backward	Переместить назад
 	Send to Back	Переместить на задний план
@@ -429,8 +429,8 @@
 	No background jobs.	Фоновых заданий нет.
 	Recover Unsaved Changes	Восстановить несохранённые изменения
 	Untitled	Без названия
-	FilmCraft was closed while “{name}” had unsaved changes.	FilmCraft был закрыт, а в проекте «{name}» оставались несохранённые изменения.
-	FilmCraft quit unexpectedly while “{name}” had unsaved changes.	FilmCraft неожиданно завершился, а в проекте «{name}» оставались несохранённые изменения.
+	Reacut was closed while “{name}” had unsaved changes.	Reacut был закрыт, а в проекте «{name}» оставались несохранённые изменения.
+	Reacut quit unexpectedly while “{name}” had unsaved changes.	Reacut неожиданно завершился, а в проекте «{name}» оставались несохранённые изменения.
 	Recover unsaved changes from {when}?	Восстановить несохранённые изменения от {when}?
 	The project had not been saved yet.	Проект ещё не был сохранён.
 	{n} sessions have unsaved changes:	Сеансов с несохранёнными изменениями: {n}
@@ -591,6 +591,11 @@
 	(gap)	(промежуток)
 	Out: {name}	Выход: {name}
 	In: {name}	Вход: {name}
+	Previous: {name}	Предыдущий: {name}
+	Next: {name}	Следующий: {name}
+	Slip: {offset} frame	Скольжение: {offset} кадр
+	Slip: {offset} frames	Скольжение, кадров: {offset}
+	at the media limit	на границе медиа
 	Play Around Edit (Space loops, Shift+K once)	Воспроизвести вокруг склейки (пробел — цикл, Shift+K — один раз)
 	Trim Backward Many	Подрезать назад на несколько кадров
 	Trim Backward	Подрезать назад
@@ -957,7 +962,7 @@
 	Font family	Семейство шрифтов
 	Label Colors	Цвета меток
 	Decoded frames held for the monitors and thumbnails: {used} of {budget}.	Декодированных кадров в памяти для мониторов и миниатюр: {used} из {budget}.
-	FilmCraft keeps the rest of the RAM free for other applications.	FilmCraft оставляет остальную оперативную память свободной для других приложений.
+	Reacut keeps the rest of the RAM free for other applications.	Reacut оставляет остальную оперативную память свободной для других приложений.
 	not available in this session	недоступно в этом сеансе
 	Currently: {loc} — {files} file(s), {size}	Сейчас: {loc} — файлов: {files}, {size}
 	 ({ch} output channels)	 (каналов выхода: {ch})
@@ -1068,7 +1073,7 @@
 	Video Frame	Кадр видео
 	Pin To	Прикрепить к
 	Pinned Edges	Закреплённые края
-	FilmCraft Graphics Template	Шаблон графики FilmCraft
+	Reacut Graphics Template	Шаблон графики Reacut
 	{n} Font	Шрифт {n}
 	{n} Size	Размер {n}
 	{n} Color	Цвет {n}
@@ -1078,7 +1083,7 @@
 	Export As Motion Graphics Template	Экспортировать как шаблон анимированной графики
 	Category:	Категория:
 	Editable properties:	Редактируемые свойства:
-	Saved as a FilmCraft graphics template (.fcgt) in your templates folder.	Сохранено как шаблон графики FilmCraft (.fcgt) в папке шаблонов.
+	Saved as a Reacut graphics template (.fcgt) in your templates folder.	Сохранено как шаблон графики Reacut (.fcgt) в папке шаблонов.
 	Exported graphics template to {path}	Шаблон графики экспортирован в {path}
 	Replace Fonts in Projects	Заменить шрифты в проектах
 	Fonts used in the project:	Шрифты, используемые в проекте:
@@ -1449,7 +1454,7 @@
 	Center of Sphere	Центр сферы
 	Cents	Центы
 	Change to Color	Изменить на цвет
-	Changes are copied in the background a moment after each edit. If FilmCraft quits unexpectedly, they are offered the next time it starts.	Изменения копируются в фоне через мгновение после каждой правки. Если FilmCraft неожиданно закроется, их предложат при следующем запуске.
+	Changes are copied in the background a moment after each edit. If Reacut quits unexpectedly, they are offered the next time it starts.	Изменения копируются в фоне через мгновение после каждой правки. Если Reacut неожиданно закроется, их предложат при следующем запуске.
 	Channel	Канал
 	Channel Blur	Размытие канала
 	Channel Mix	Микширование каналов
@@ -1822,13 +1827,13 @@
 	Hard Limiter	Жёсткий ограничитель
 	Hard Mix	Жёсткое смешивание
 	Hardware decoding	Аппаратное декодирование
-	Hardware decoding: Auto uses the system's video decoder (VideoToolbox on macOS, Media Foundation on Windows, VA-API or NVDEC for H.264 and HEVC on Linux) for the streams it supports, and FilmCraft's own decoder for everything else or if the hardware fails. Media that is already open keeps its decoder until it is reopened.	Аппаратное декодирование: в режиме «Авто» используется системный видеодекодер (VideoToolbox в macOS, Media Foundation в Windows, VA-API или NVDEC для H.264 и HEVC в Linux) для поддерживаемых им потоков, а для всего остального или при сбое оборудования — собственный декодер FilmCraft. Уже открытые медиа сохраняют свой декодер до повторного открытия.
+	Hardware decoding: Auto uses the system's video decoder (VideoToolbox on macOS, Media Foundation on Windows, VA-API or NVDEC for H.264 and HEVC on Linux) for the streams it supports, and Reacut's own decoder for everything else or if the hardware fails. Media that is already open keeps its decoder until it is reopened.	Аппаратное декодирование: в режиме «Авто» используется системный видеодекодер (VideoToolbox в macOS, Media Foundation в Windows, VA-API или NVDEC для H.264 и HEVC в Linux) для поддерживаемых им потоков, а для всего остального или при сбое оборудования — собственный декодер Reacut. Уже открытые медиа сохраняют свой декодер до повторного открытия.
 	Head Size	Размер головы
 	Heart	Сердце
 	Height	Высота
 	Hexagon	Шестиугольник
 	Hide Back Face	Скрыть обратную сторону
-	Hide FilmCraft	Скрыть FilmCraft
+	Hide Reacut	Скрыть Reacut
 	Hide Others	Скрыть остальные
 	High	Высокий
 	High Cutoff	Срез ВЧ
@@ -2099,7 +2104,7 @@
 	Night	Ночь
 	No Motion	Без движения
 	No Scroll	Без прокрутки
-	No plugins are installed. Changes will take effect the next time you start FilmCraft.	Плагины не установлены. Изменения вступят в силу при следующем запуске FilmCraft.
+	No plugins are installed. Changes will take effect the next time you start Reacut.	Плагины не установлены. Изменения вступят в силу при следующем запуске Reacut.
 	Noise	Шум
 	Noise & Grain	Шум и зерно
 	Noise (Legacy)	Шум (устаревший)
@@ -2531,7 +2536,7 @@
 	Template Properties	Свойства шаблона
 	Text Animator	Аниматор текста
 	Text Color	Цвет текста
-	The media cache holds render previews of unsaved projects and other files FilmCraft can recreate. Deleting them is always safe; FilmCraft rebuilds them as needed.	Кэш медиа хранит превью визуализации несохранённых проектов и других файлов, которые FilmCraft может воссоздать. Удалять их всегда безопасно: FilmCraft пересоздаёт их по мере необходимости.
+	The media cache holds render previews of unsaved projects and other files Reacut can recreate. Deleting them is always safe; Reacut rebuilds them as needed.	Кэш медиа хранит превью визуализации несохранённых проектов и других файлов, которые Reacut может воссоздать. Удалять их всегда безопасно: Reacut пересоздаёт их по мере необходимости.
 	Thickness	Толщина
 	Tile Gradient	Плиточный градиент
 	Tilt	Наклон
@@ -2741,7 +2746,7 @@
 	System Compatibility Report	Отчёт о совместимости системы
 	no GPU adapter: the CPU compositor is used	Нет адаптера GPU: используется композитор на CPU
 	Avid Log Exchange	Avid Log Exchange (ALE)
-	FilmCraft Project	Проект FilmCraft
+	Reacut Project	Проект Reacut
 	{name} Selection.fcproj	{name} Выделение.fcproj
 	{name} (Simplified)	{name} (упрощённая)
 	Find in:	Найти в:
@@ -2881,7 +2886,7 @@
 	Start Queue	Запустить очередь
 	Stop	Остановить
 	Clear Finished	Очистить завершённые
-	Not supported by FilmCraft's encoders yet	Кодировщики FilmCraft пока это не поддерживают
+	Not supported by Reacut's encoders yet	Кодировщики Reacut пока это не поддерживают
 	Sequence name	Имя последовательности
 	Folder	Папка
 	Preset	Пресет
@@ -2971,7 +2976,7 @@
 	Drag a clip to slide it between its neighbours.	Перетащите клип для смещения между соседними клипами.
 	Drag to scroll the timeline.	Перетащите, чтобы прокрутить таймлайн.
 	Click to zoom in; Opt-click to zoom out.	Щёлкните для увеличения масштаба; Opt+щелчок — для уменьшения.
-	FilmCraft hit an error	В FilmCraft произошла ошибка
+	Reacut hit an error	В Reacut произошла ошибка
 	Details: {path}	Подробности: {path}
 	Opened {url}	Открыто {url}
 	(empty)	(пусто)
@@ -3230,7 +3235,7 @@
 	QuickTime, ProRes 4444 (4:4:4) with alpha channel, 24-bit 48 kHz PCM	QuickTime, ProRes 4444 (4:4:4) с альфа-каналом, PCM 24 бит, 48 кГц
 	QuickTime, ProRes 4444 XQ (4:4:4), 24-bit 48 kHz PCM	QuickTime, ProRes 4444 XQ (4:4:4), PCM 24 бит, 48 кГц
 	QuickTime, ProRes 422, 24-bit 48 kHz PCM	QuickTime, ProRes 422, PCM 24 бит, 48 кГц
-	Quit FilmCraft	Выйти из FilmCraft
+	Quit Reacut	Выйти из Reacut
 	Rate Stretch Tool	Растяжение скорости
 	Razor Tool	Лезвие
 	Rectangle Tool	Прямоугольник
@@ -3531,8 +3536,8 @@
 	Composite in Linear Color	Компоновка в линейном цвете
 	Auto Tone Map Media (HDR and log into SDR)	Автоматическое отображение тонов медиа (HDR и лог в SDR)
 	Configure…	Настроить…
-	Not supported in FilmCraft yet	Пока не поддерживается в FilmCraft
-	FilmCraft always composites in linear light	FilmCraft всегда компонует в линейном свете
+	Not supported in Reacut yet	Пока не поддерживается в Reacut
+	Reacut always composites in linear light	Reacut всегда компонует в линейном свете
 	Loop marked range	Цикл по помеченному диапазону
 	Play Source	Воспроизвести источник
 	Source Play/Stop	Воспроизвести/остановить источник
@@ -3593,7 +3598,7 @@
 	Opens in your web browser: {url}	Откроется в браузере: {url}
 	Saves this session's log and shows it in your file manager.	Сохраняет журнал этого сеанса и показывает его в файловом менеджере.
 	Shows a report on this computer.	Показывает отчёт о компьютере.
-	Shows the version, community links and credits in a FilmCraft window.	Показывает версию, ссылки сообщества и список участников в окне FilmCraft.
+	Shows the version, community links and credits in a Reacut window.	Показывает версию, ссылки сообщества и список участников в окне Reacut.
 	Couldn't open your web browser	Не удалось открыть браузер
 	Open this address in your browser yourself:	Этот адрес нужно открыть в браузере вручную:
 	Reset Interface Zoom	Сбросить масштаб интерфейса
@@ -3663,7 +3668,7 @@
 # The strings the missing-translations report listed for ru (#1674).
 	1 frame ({seconds} s)	1 кадр ({seconds} с)
 	1/2	1/2
-	AV1 needs a hardware encoder; none was found on this machine, and FilmCraft has no software AV1 encoder yet.	Для AV1 требуется аппаратный кодировщик; на этом компьютере он не найден, а программного кодировщика AV1 в FilmCraft пока нет.
+	AV1 needs a hardware encoder; none was found on this machine, and Reacut has no software AV1 encoder yet.	Для AV1 требуется аппаратный кодировщик; на этом компьютере он не найден, а программного кодировщика AV1 в Reacut пока нет.
 	Add Track	Добавить дорожку
 	Audio Names	Имена аудио
 	Audio output failed: playing without sound (check Settings > Audio Hardware)	Ошибка аудиовыхода: воспроизведение без звука (проверьте Настройки > Аудиооборудование)
@@ -3688,13 +3693,13 @@
 	End: {tc}	Конец: {tc}
 	Enter a positive duration within the supported speed range.	Введите положительную длительность в поддерживаемом диапазоне скоростей.
 	Exported {path} as {format}, from its file extension	Экспортировано {path} как {format}, по расширению файла
-	FilmCraft Updates	Обновления FilmCraft
-	FilmCraft {version} is currently the newest version available.	FilmCraft {version} — самая новая доступная версия.
-	H.265 (HEVC) needs a hardware encoder (NVENC on NVIDIA GPUs, VideoToolbox on macOS); none was found on this machine, and FilmCraft has no software H.265 encoder yet. Choose H.264 or ProRes instead.	Для H.265 (HEVC) требуется аппаратный кодировщик (NVENC на GPU NVIDIA, VideoToolbox на macOS); на этом компьютере он не найден, а программного кодировщика H.265 в FilmCraft пока нет. Вместо него выберите H.264 или ProRes.
+	Reacut Updates	Обновления Reacut
+	Reacut {version} is currently the newest version available.	Reacut {version} — самая новая доступная версия.
+	H.265 (HEVC) needs a hardware encoder (NVENC on NVIDIA GPUs, VideoToolbox on macOS); none was found on this machine, and Reacut has no software H.265 encoder yet. Choose H.264 or ProRes instead.	Для H.265 (HEVC) требуется аппаратный кодировщик (NVENC на GPU NVIDIA, VideoToolbox на macOS); на этом компьютере он не найден, а программного кодировщика H.265 в Reacut пока нет. Вместо него выберите H.264 или ProRes.
 	In:	Вход:
 	Invalid duration: {error}	Недопустимая длительность: {error}
 	Keep Existing Settings	Сохранить существующие параметры
-	Looks for a newer FilmCraft release and offers to update.	Ищет более новый выпуск FilmCraft и предлагает обновиться.
+	Looks for a newer Reacut release and offers to update.	Ищет более новый выпуск Reacut и предлагает обновиться.
 	Marker Color:	Цвет маркера:
 	No matching text.	Совпадений с текстом нет.
 	No text graphics in this sequence. Add text with the Type tool.	В этой последовательности нет текстовой графики. Добавьте текст инструментом «Текст».

@@ -1,20 +1,20 @@
 #!/bin/bash
 #
-# What `cargo run` runs FilmCraft through on macOS — see `.cargo/config.toml`
+# What `cargo run` runs Reacut through on macOS — see `.cargo/config.toml`
 # at the repository root.
 #
 # The Reaction page's Browser Source draws with CEF, and on a Mac CEF is a
 # framework only an application bundle carries, with Chromium's render, GPU
 # and other processes as applications beside it — an executable run on its
 # own finds none. This assembles the development bundle beside the executable
-# cargo just built — `target/<profile>/FilmCraft.app`, a fraction of a second
+# cargo just built — `target/<profile>/Reacut.app`, a fraction of a second
 # once the framework is in — and runs the executable inside it.
 #
 # Runs it, rather than asking the system to open the bundle: the process is
 # still this terminal's child, so its output is here, Ctrl+C stops it, and a
 # permission it is given — screen recording, the camera — is the terminal's,
-# which stays given however often FilmCraft is rebuilt. Opened as an
-# application it would be FilmCraft asking, and an ad-hoc-signed FilmCraft is
+# which stays given however often Reacut is rebuilt. Opened as an
+# application it would be Reacut asking, and an ad-hoc-signed Reacut is
 # a new application to the system every build.
 #
 # The bundle is only the shape CEF needs, on this machine, fast: the
@@ -26,20 +26,20 @@
 # `FILMCRAFT_RUN_APP_DRY_RUN=1` lays the bundle out and says what it would
 # run, without running it.
 #
-# Anything else cargo runs — a test binary, an example, filmcraft-cli — is
+# Anything else cargo runs — a test binary, an example, reacut-cli — is
 # run as it is.
 
 set -euo pipefail
 
 executable=$1
 shift
-if [ "$(basename "$executable")" != "filmcraft" ]; then
+if [ "$(basename "$executable")" != "reacut" ]; then
     exec "$executable" "$@"
 fi
 
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
-app="$(dirname "$executable")/FilmCraft.app"
+app="$(dirname "$executable")/Reacut.app"
 contents="$app/Contents"
 frameworks="$contents/Frameworks"
 mkdir -p "$contents/MacOS" "$contents/Resources" "$frameworks"
@@ -55,7 +55,7 @@ place() {
     cp "$1" "$2"
     chmod u+w "$2"
 }
-place "$executable" "$contents/MacOS/FilmCraft"
+place "$executable" "$contents/MacOS/Reacut"
 
 # The description of the bundle: the release template, with the version the
 # executable itself reports.
@@ -67,7 +67,7 @@ sed -e "s/@VERSION@/$version/g" \
     "$here/Info.plist.in" > "$contents/Info.plist"
 plutil -lint "$contents/Info.plist" > /dev/null
 printf 'APPL????' > "$contents/PkgInfo"
-cp -f "$root/assets/app-icon/filmcraft.icns" "$contents/Resources/FilmCraft.icns"
+cp -f "$root/assets/app-icon/filmcraft.icns" "$contents/Resources/Reacut.icns"
 
 # The browser engine, where this machine has one: CEF's framework for the
 # version Cargo.lock names, out of CEF_PATH — copied once, marked with that
@@ -92,15 +92,15 @@ else
 fi
 
 # Chromium starts its helper processes as applications of their own beside
-# the framework, named for this bundle's executable — and each runs FilmCraft
+# the framework, named for this bundle's executable — and each runs Reacut
 # itself, which knows it is one of them from its arguments (the first thing
 # `main` does).
 for role in "" " (GPU)" " (Renderer)" " (Plugin)" " (Alerts)"; do
-    name="FilmCraft Helper$role"
+    name="Reacut Helper$role"
     suffix=$(echo "$role" | tr -d ' ()' | tr '[:upper:]' '[:lower:]')
     helper="$frameworks/$name.app/Contents"
     mkdir -p "$helper/MacOS"
-    place "$contents/MacOS/FilmCraft" "$helper/MacOS/$name"
+    place "$contents/MacOS/Reacut" "$helper/MacOS/$name"
     cat > "$helper/Info.plist" << PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -109,7 +109,7 @@ for role in "" " (GPU)" " (Renderer)" " (Plugin)" " (Alerts)"; do
 	<key>CFBundleExecutable</key>
 	<string>$name</string>
 	<key>CFBundleIdentifier</key>
-	<string>ai.storyteller.filmcraft.helper${suffix:+.$suffix}</string>
+	<string>io.github.fedeaxal.reacut.helper${suffix:+.$suffix}</string>
 	<key>CFBundleName</key>
 	<string>$name</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -130,8 +130,8 @@ PLIST
 done
 
 if [ "${FILMCRAFT_RUN_APP_DRY_RUN:-0}" = 1 ]; then
-    echo "dry run: made $app; would run $contents/MacOS/FilmCraft $*"
+    echo "dry run: made $app; would run $contents/MacOS/Reacut $*"
     exit 0
 fi
 
-exec "$contents/MacOS/FilmCraft" "$@"
+exec "$contents/MacOS/Reacut" "$@"

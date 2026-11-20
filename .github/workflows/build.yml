@@ -233,7 +233,7 @@ jobs:
 
       # Builds (/MD, per-target), stages the FFmpeg / sherpa-onnx / ONNX
       # Runtime / VC++ runtime DLLs beside the executables, and produces
-      # filmcraft-<version>-windows-x64.msi and the portable zip. Signing is
+      # reacut-<version>-windows-x64.msi and the portable zip. Signing is
       # skipped with a warning: no certificate is configured here.
       - name: Package
         shell: pwsh
@@ -250,7 +250,7 @@ jobs:
       - name: Upload the artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: filmcraft-x86_64-windows
+          name: reacut-x86_64-windows
           path: |
             dist/*.msi
             dist/*-portable.zip
@@ -396,7 +396,7 @@ jobs:
              ".onnxruntime/$root/ThirdPartyNotices.txt" .onnxruntime/
           ls -l .onnxruntime
 
-      # Builds (--target this matrix arch), assembles FilmCraft.app with the
+      # Builds (--target this matrix arch), assembles Reacut.app with the
       # FFmpeg and ONNX Runtime dylibs beside the executable, checks the
       # bundle is self-contained,
       # signs ad hoc (no certificate here: Gatekeeper asks about a downloaded
@@ -410,7 +410,7 @@ jobs:
       - name: Upload the artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: filmcraft-${{ matrix.suffix }}
+          name: reacut-${{ matrix.suffix }}
           path: |
             dist/*.dmg
             dist/*cli*.zip

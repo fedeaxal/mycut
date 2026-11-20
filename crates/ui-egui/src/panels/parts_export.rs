@@ -768,7 +768,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
             if strip.width() <= 0.0 || strip.height() <= 0.0 {
                 continue;
             }
-            egui::Area::new(egui::Id::new(("parts-export-modal-block", index)))
+            egui::Area::new(egui::Id::unique(("parts-export-modal-block", index)))
                 .order(egui::Order::Middle)
                 .fixed_pos(strip.min)
                 .default_size(strip.size())

@@ -3,7 +3,7 @@
 Use a **Cross Dissolve** transition to fade a picture in or out. Use **Volume** keyframes
 to make a clip's sound gradually louder or quieter.
 
-These instructions follow FilmCraft's current `main` branch, checked on 24 October 2026
+These instructions follow Reacut's current `main` branch, checked on 24 October 2026
 ([source revision](https://github.com/storytold/filmcraft/commit/552f008d2757e307194256b3e672c9c1de4fa9b2)).
 An older installed release may differ. The [planned fade handles](#whats-coming-timeline-fade-handles)
 are separate from the operations available now.
@@ -20,7 +20,7 @@ fade at a free edge brings one clip in or takes it out.
 
 ## Before you start
 
-1. Open FilmCraft and choose **File ▸ Import…**. Pick a video with sound, at least four
+1. Open Reacut and choose **File ▸ Import…**. Pick a video with sound, at least four
    seconds long, and confirm.
 2. In the **Project** panel, right-click the imported clip and choose **New Sequence From Clip**.
    Its picture appears on a video track such as **V1**, and its sound on an audio track such as **A1**.
@@ -31,7 +31,7 @@ fade at a free edge brings one clip in or takes it out.
 5. Choose **File ▸ Save As…** to save your practice project.
 
 Use the **Selection Tool** for selecting clips and transitions. Its default shortcut is **V**;
-the **Pen Tool** is **P**. Shortcuts below assume FilmCraft Default or Premiere Pro Compatible.
+the **Pen Tool** is **P**. Shortcuts below assume Reacut Default or Premiere Pro Compatible.
 If you have changed presets, check **Edit ▸ Keyboard Shortcuts…** or use the Tools panel.
 
 To undo an edit, choose **Edit ▸ Undo** (**Ctrl+Z** on Windows/Linux, **Cmd+Z** on macOS).
@@ -52,7 +52,7 @@ Finish typing in a value field and click outside it before undoing a timeline ed
 You can also click the transition once and change **Duration** in **Effect Controls**.
 Undo the duration change or the transition application with **Edit ▸ Undo**, one edit at a time.
 
-If a clip touches another clip at that edge, FilmCraft makes a transition between the two
+If a clip touches another clip at that edge, Reacut makes a transition between the two
 instead of a fade from empty space. On an upper video track, a fade can reveal the picture
 underneath rather than black.
 
@@ -139,7 +139,7 @@ so grab an individual diamond when shaping one end of a fade.
    shown above the audio effects.
 3. In the keyframe area to the right of **Level**, click the diamond you want to edit.
    This moves the playhead to that keyframe. Click the blue **Level** number, type a value
-   such as `0` or `-96`, and click the **Level** label to commit it. FilmCraft treats
+   such as `0` or `-96`, and click the **Level** label to commit it. Reacut treats
    `-96 dB` or lower as silence.
 4. Preview again with **Space**. Use **Edit ▸ Undo** to restore the previous value or position.
 

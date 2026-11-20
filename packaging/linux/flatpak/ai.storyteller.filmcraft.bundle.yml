@@ -1,7 +1,7 @@
 # Flatpak manifest for the single-file bundle attached to every GitHub release
-# (filmcraft-<version>-linux-<arch>.flatpak). Build it with packaging/linux/flatpak-bundle.sh.
+# (reacut-<version>-linux-<arch>.flatpak). Build it with packaging/linux/flatpak-bundle.sh.
 #
-# It repackages the release's own Linux tarball (filmcraft-<version>-linux-<arch>.tar.gz,
+# It repackages the release's own Linux tarball (reacut-<version>-linux-<arch>.tar.gz,
 # built on Ubuntu 22.04 by package.sh) instead of compiling Rust inside flatpak-builder: no
 # network and no vendored crate sources during the build, a few seconds instead of 20+ minutes,
 # and byte-for-byte the same binaries as the AppImage/deb/rpm. The script unpacks the tarball
@@ -12,11 +12,11 @@
 #
 # ai.storyteller.filmcraft.yml (same directory) is the from-source manifest for Flathub. Keep
 # runtime-version and finish-args identical in both (packaging-lint checks this).
-id: ai.storyteller.filmcraft
+id: ai.storyteller.reacut
 runtime: org.freedesktop.Platform
 runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
-command: filmcraft
+command: reacut
 finish-args:
   # The shared updater inspects and updates this installation via flatpak-spawn --host.
   - --talk-name=org.freedesktop.Flatpak
@@ -45,18 +45,18 @@ finish-args:
   # 127.0.0.1 inside the sandbox. Host-wide filesystem access is still not granted.
   - --share=network
 modules:
-  - name: filmcraft
+  - name: reacut
     buildsystem: simple
     build-commands:
-      - install -Dm755 bin/filmcraft /app/bin/filmcraft
-      - install -Dm755 bin/filmcraft-cli /app/bin/filmcraft-cli
+      - install -Dm755 bin/reacut /app/bin/reacut
+      - install -Dm755 bin/reacut-cli /app/bin/reacut-cli
       - install -Dm644 share/applications/ai.storyteller.filmcraft.desktop /app/share/applications/ai.storyteller.filmcraft.desktop
       # The same MIME file the deb/rpm install: it defines the .fcproj project type (the
       # runtime's shared-mime-info already knows the video and audio formats).
       - install -Dm644 share/mime/packages/ai.storyteller.filmcraft.xml /app/share/mime/packages/ai.storyteller.filmcraft.xml
       # Already has the release's version and date substituted by package.sh.
       - install -Dm644 share/metainfo/ai.storyteller.filmcraft.metainfo.xml /app/share/metainfo/ai.storyteller.filmcraft.metainfo.xml
-      - mkdir -p /app/share/icons /app/share/doc && cp -R share/icons/hicolor /app/share/icons/ && cp -R share/doc/filmcraft /app/share/doc/
+      - mkdir -p /app/share/icons /app/share/doc && cp -R share/icons/hicolor /app/share/icons/ && cp -R share/doc/reacut /app/share/doc/
     sources:
       - type: dir
         path: stage

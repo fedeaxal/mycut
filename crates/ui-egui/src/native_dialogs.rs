@@ -255,7 +255,7 @@ pub(crate) const EXPORT_SAVE_DIALOGS: [(&str, &str, &str); 7] = [
     ("file.exportFcpxml", "FCPXML", "fcpxml"),
     ("file.exportOtio", "OpenTimelineIO", "otio"),
     ("file.exportAle", "Avid Log Exchange", "ale"),
-    ("file.exportSelectionProject", "FilmCraft Project", "fcproj"),
+    ("file.exportSelectionProject", "Reacut Project", "fcproj"),
 ];
 
 /// `then` for `dialog`: a save dialog's answer gets its extension ([`with_save_extension`]), and

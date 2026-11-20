@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# Repackage a FilmCraft Linux tarball as a single-file Flatpak bundle:
+# Repackage a Reacut Linux tarball as a single-file Flatpak bundle:
 #
-#   $DIST/filmcraft-<version>-linux-<arch>.flatpak
+#   $DIST/reacut-<version>-linux-<arch>.flatpak
 #
 # Usage: packaging/linux/flatpak-bundle.sh [--no-test] [TARBALL]
 #
-# TARBALL defaults to $DIST/filmcraft-<version>-linux-<arch>.tar.gz from package.sh. The bundle
+# TARBALL defaults to $DIST/reacut-<version>-linux-<arch>.tar.gz from package.sh. The bundle
 # is built for the host architecture (x86_64 or aarch64), which must match the tarball's.
 # Needs flatpak, flatpak-builder and the SVG pixbuf loader (librsvg2-common) for the host's
 # `appstreamcli compose`; the freedesktop runtime and SDK named in the manifest are
 # installed per-user from Flathub. Unless --no-test, the bundle is then installed per-user and
-# `filmcraft-cli --version` is run inside the sandbox as a smoke test.
+# `reacut-cli --version` is run inside the sandbox as a smoke test.
 # Manifest: packaging/linux/flatpak/ai.storyteller.filmcraft.bundle.yml.
 set -euo pipefail
 # shellcheck source=../env.sh
 . "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 HERE="$ROOT/packaging/linux"
-APP_ID=ai.storyteller.filmcraft
+APP_ID=ai.storyteller.reacut
 FLATHUB=https://dl.flathub.org/repo/flathub.flatpakrepo
 
 TEST=1
@@ -45,13 +45,13 @@ for tool in flatpak flatpak-builder; do
   command -v "$tool" >/dev/null || { echo "error: $tool not found (apt install flatpak flatpak-builder librsvg2-common)" >&2; exit 1; }
 done
 
-echo "==> FilmCraft $VERSION Flatpak bundle for $ARCH from $(basename "$TARBALL")"
+echo "==> Reacut $VERSION Flatpak bundle for $ARCH from $(basename "$TARBALL")"
 
 WORK="$CARGO_TARGET_DIR/flatpak-bundle"
 rm -rf "$WORK"
 mkdir -p "$WORK/stage"
 tar -xzf "$TARBALL" -C "$WORK/stage" --strip-components=1
-[[ -x "$WORK/stage/bin/filmcraft" ]] || { echo "error: $TARBALL has no bin/filmcraft" >&2; exit 1; }
+[[ -x "$WORK/stage/bin/reacut" ]] || { echo "error: $TARBALL has no bin/reacut" >&2; exit 1; }
 cp "$HERE/flatpak/$APP_ID.bundle.yml" "$WORK/$APP_ID.yml"
 
 flatpak remote-add --user --if-not-exists flathub "$FLATHUB"
@@ -73,7 +73,7 @@ fi
 if [[ "$TEST" = 1 ]]; then
   flatpak install --user -y --noninteractive --reinstall "$OUT"
   flatpak info --user "$APP_ID"
-  flatpak run --command=filmcraft-cli "$APP_ID" --version
+  flatpak run --command=reacut-cli "$APP_ID" --version
   flatpak run --command=sh "$APP_ID" -c 'ls /app/share/applications /app/share/metainfo /app/share/mime/packages /app/share/icons/hicolor/scalable/apps'
 fi
 echo "==> done"

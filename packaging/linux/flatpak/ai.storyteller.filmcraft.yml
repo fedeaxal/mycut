@@ -1,25 +1,25 @@
-# Flatpak manifest for FilmCraft, ready for a Flathub submission.
+# Flatpak manifest for Reacut, ready for a Flathub submission.
 #
 # Flatpak builds run offline, so the crate sources must be vendored first. From the repo root:
 #
 #   curl -fsSLO https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/cargo/flatpak-cargo-generator.py
 #   python3 flatpak-cargo-generator.py Cargo.lock -o packaging/linux/flatpak/cargo-sources.json
 #   flatpak-builder --user --install --force-clean build-flatpak packaging/linux/flatpak/ai.storyteller.filmcraft.yml
-#   flatpak run ai.storyteller.filmcraft
+#   flatpak run ai.storyteller.reacut
 #
 # The command-line tool and its MCP server run in the same sandbox, without opening a window:
 #
-#   flatpak run --command=filmcraft-cli ai.storyteller.filmcraft --version
-#   flatpak run --command=filmcraft-cli ai.storyteller.filmcraft mcp
+#   flatpak run --command=reacut-cli ai.storyteller.reacut --version
+#   flatpak run --command=reacut-cli ai.storyteller.reacut mcp
 #
 # For Flathub, replace the `dir` source with a `git` source pinned to a release tag and commit.
-id: ai.storyteller.filmcraft
+id: ai.storyteller.reacut
 runtime: org.freedesktop.Platform
 runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
-command: filmcraft
+command: reacut
 finish-args:
   # The shared updater inspects and updates this installation via flatpak-spawn --host.
   - --talk-name=org.freedesktop.Flatpak
@@ -50,19 +50,19 @@ finish-args:
 build-options:
   append-path: /usr/lib/sdk/rust-stable/bin
 modules:
-  - name: filmcraft
+  - name: reacut
     buildsystem: simple
     build-options:
       env:
-        CARGO_HOME: /run/build/filmcraft/cargo
+        CARGO_HOME: /run/build/reacut/cargo
         CARGO_NET_OFFLINE: 'true'
     build-commands:
-      - cargo --offline build --release --locked -p filmcraft -p filmcraft-cli
-      - install -Dm755 target/release/filmcraft /app/bin/filmcraft
-      - install -Dm644 NOTICE /app/share/doc/filmcraft/NOTICE
+      - cargo --offline build --release --locked -p reacut -p reacut-cli
+      - install -Dm755 target/release/reacut /app/bin/reacut
+      - install -Dm644 NOTICE /app/share/doc/reacut/NOTICE
       # The headless CLI and its stdio MCP server, as in the release bundle (#346).
-      - install -Dm755 target/release/filmcraft-cli /app/bin/filmcraft-cli
-      - install -Dm644 packaging/linux/ai.storyteller.filmcraft.desktop /app/share/applications/ai.storyteller.filmcraft.desktop
+      - install -Dm755 target/release/reacut-cli /app/bin/reacut-cli
+      - install -Dm644 packaging/linux/io.github.fedeaxal.reacut.desktop /app/share/applications/ai.storyteller.filmcraft.desktop
       - install -Dm644 packaging/linux/ai.storyteller.filmcraft.mime.xml /app/share/mime/packages/ai.storyteller.filmcraft.xml
       - mkdir -p /app/share/icons && cp -R assets/app-icon/hicolor /app/share/icons/
       - >-

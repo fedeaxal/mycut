@@ -38,7 +38,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     let mut open = true;
     match d {
         Dialog::About => {
-            egui::Window::new(tl!("About FilmCraft"))
+            egui::Window::new(tl!("About Reacut"))
                 .id(egui::Id::unique("About FilmCraft"))
                 .open(&mut open)
                 .collapsible(false)
@@ -430,7 +430,7 @@ fn delete_tracks(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
 ///
 /// Automation id: `about.version`.
 fn about(app: &mut FilmcraftApp, ui: &mut egui::Ui) {
-    ui.heading("FilmCraft");
+    ui.heading("Reacut");
     let version = tlf!("Version {version}", version = env!("CARGO_PKG_VERSION"));
     let r = ui.label(version.clone());
     app.auto.add("about.version", r.rect, &version);

@@ -301,7 +301,7 @@ fn a_start_that_hung_in_its_window_moves_on_from_its_mode() {
 fn no_mode_passing_or_a_chosen_mode_failing_returns_the_message() {
     let dir = temp_dir("choose-none");
     let exe = Path::new("filmcraft");
-    let log = PathBuf::from("/data/Logs/filmcraft.log");
+    let log = PathBuf::from("/data/Logs/reacut.log");
     let mut start = GraphicsStart::begin_at(Some(&dir), false, None, NOW, 15);
     let (seen, test) = counting(|_| Outcome::Hung(Report { stage: Some("device".to_string()), ..Report::default() }, 25));
     let msg = choose_with(&mut start, false, Some(&log), exe, "", test).err().unwrap_or_default();

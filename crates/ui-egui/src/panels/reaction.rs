@@ -42,10 +42,10 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, body: egui::Rect) {
                 .unwrap_or_else(|| data_dir.join("Logs"));
             reaction::paths::set_host_directories(data_dir.join("Reaction"), logs_dir);
         }
-        // 内嵌 reaction 的 macOS 应用菜单随之说本应用的名字("关于 FilmCraft/
-        // 退出 FilmCraft"而不是"关于 reaction"),About/Quit 经
+        // 内嵌 reaction 的 macOS 应用菜单随之说本应用的名字("关于 Reacut/
+        // 退出 Reacut"而不是"关于 reaction"),About/Quit 经
         // `take_pending_app_menu_commands` 交还本页执行(见 show 末尾)。
-        reaction::host::set_app_name("FilmCraft");
+        reaction::host::set_app_name("Reacut");
         let settings_store = reaction::SettingsStore::for_current_user();
         let mut settings = settings_store.load().unwrap_or_else(|error| {
             log::error!("could not load reaction settings: {error}");
@@ -126,7 +126,15 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, body: egui::Rect) {
                 );
             })
             .ok();
-        let render_state = app.gpu.as_ref().map(|gpu| gpu.render_state.clone());
+        // The engine runs on the window's wgpu device whether or not the
+        // editor's GPU compositor is on: `gpu` is None on a machine whose
+        // only adapter is a software rasterizer (WARP) — the editor composites
+        // on the CPU — and this page's engine must still come up there. Its
+        // backend pairs its D3D11 stack with whatever adapter this device is
+        // on (`engine::backend`); taking the state from `gpu` used to leave
+        // the page without an engine at all, and nothing added to the canvas
+        // ever showed.
+        let render_state = app.wgpu_render_state.clone();
         app.reaction = Some(reaction::ObsApp::new_embedded(
             ui.ctx(),
             render_state,

@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-  Build, sign and package FilmCraft for Windows.
+  Build, sign and package Reacut for Windows.
 
 .DESCRIPTION
   Produces, in $env:DIST (default: dist/release):
-    filmcraft-<version>-windows-<arch>.msi            per-machine installer (WiX v5)
-    filmcraft-<version>-windows-<arch>-portable.zip   filmcraft.exe + filmcraft-cli.exe + portable.txt
+    reacut-<version>-windows-<arch>.msi            per-machine installer (WiX v5)
+    reacut-<version>-windows-<arch>-portable.zip   reacut.exe + reacut-cli.exe + portable.txt
 
   The binaries are /MD (dynamic CRT): the staged VC++ runtime DLLs are required and included, so
   the MSI and portable zip are still self-contained. Signing is delegated to sign.ps1 (skipped
@@ -53,7 +53,7 @@ New-Item -ItemType Directory -Force -Path $Dist | Out-Null
 if (-not $env:FILMCRAFT_BUILD_SHA) { $env:FILMCRAFT_BUILD_SHA = (git -C $Root rev-parse HEAD 2>$null) }
 if (-not $env:FILMCRAFT_BUILD_DATE) { $env:FILMCRAFT_BUILD_DATE = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd') }
 
-Write-Output "FilmCraft $Version for Windows $Arch ($Target)"
+Write-Output "Reacut $Version for Windows $Arch ($Target)"
 
 if (-not $SkipBuild) {
   # The build is /MD (dynamic CRT): the face pipeline's ort official prebuilt is /MD-built and the
@@ -63,7 +63,7 @@ if (-not $SkipBuild) {
   # Fail the build (rather than warn) if the icon/VERSIONINFO can't be embedded.
   $env:FILMCRAFT_REQUIRE_WINRES = '1'
   # Official packages include Kokoro natural voices (downloaded on first use). #2318 #3773
-  Invoke-Native "cargo build ($Target)" { cargo build --release --locked -p filmcraft -p filmcraft-cli --features filmcraft/neural-voices --target $Target }
+  Invoke-Native "cargo build ($Target)" { cargo build --release --locked -p reacut -p reacut-cli --features reacut/neural-voices --target $Target }
 }
 
 $Bin = Join-Path $TargetDir "$Target\release"
@@ -78,7 +78,7 @@ function Get-PeHeader([string] $Path) {
   return @{ Machine = [BitConverter]::ToUInt16($bytes, $pe + 4); Subsystem = [BitConverter]::ToUInt16($bytes, $pe + 0x5C) }
 }
 $Machine = switch ($Arch) { 'x64' { 0x8664 } 'x86' { 0x14C } 'arm64' { 0xAA64 } }
-foreach ($check in @(@('filmcraft.exe', 2), @('filmcraft-cli.exe', 3))) {
+foreach ($check in @(@('reacut.exe', 2), @('reacut-cli.exe', 3))) {
   $h = Get-PeHeader (Join-Path $Bin $check[0])
   if ($h.Machine -ne $Machine) { throw "$($check[0]) is for machine 0x$('{0:X}' -f $h.Machine), expected 0x$('{0:X}' -f $Machine) ($Arch)" }
   if ($h.Subsystem -ne $check[1]) { throw "$($check[0]) has PE subsystem $($h.Subsystem), expected $($check[1])" }
@@ -89,9 +89,9 @@ Remove-Item -Recurse -Force $Stage -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $Stage | Out-Null
 # Dependency font notices are required even without optional craft-fonts.
 Copy-Item -LiteralPath (Join-Path $Root 'NOTICE') -Destination $Stage
-Copy-Item (Join-Path $Bin 'filmcraft.exe'), (Join-Path $Bin 'filmcraft-cli.exe') $Stage
+Copy-Item (Join-Path $Bin 'reacut.exe'), (Join-Path $Bin 'reacut-cli.exe') $Stage
 
-& (Join-Path $PSScriptRoot 'sign.ps1') (Join-Path $Stage 'filmcraft.exe') (Join-Path $Stage 'filmcraft-cli.exe')
+& (Join-Path $PSScriptRoot 'sign.ps1') (Join-Path $Stage 'reacut.exe') (Join-Path $Stage 'reacut-cli.exe')
 
 # ---- runtime libraries the executables load at run time ----------------------------------------
 # FFmpeg links dynamically and is found beside the executable (FFMPEG_DIR is an optional CI input:
@@ -170,10 +170,10 @@ if ($env:CRAFT_FONTS_DIR) {
 # ---- end font notices for the MSI --------------------------------------------------------------
 
 # ---- MSI ---------------------------------------------------------------------------------------
-$Msi = Join-Path $Dist "filmcraft-$Version-windows-$Arch.msi"
+$Msi = Join-Path $Dist "reacut-$Version-windows-$Arch.msi"
 Invoke-Native 'WiX UI extension' { wix extension add -g WixToolset.UI.wixext/5.0.2 }
 Invoke-Native 'wix build' {
-  wix build (Join-Path $PSScriptRoot 'filmcraft.wxs') -arch $Arch -ext WixToolset.UI.wixext `
+  wix build (Join-Path $PSScriptRoot 'reacut.wxs') -arch $Arch -ext WixToolset.UI.wixext `
     -d "Version=$MsiVersion" -d "BinDir=$Stage" -d "IconPath=$(Join-Path $Root 'assets\app-icon\filmcraft.ico')" `
     -d "DocsDir=$Docs" -d "HasCraftFontLicences=$HasCraftFontLicences" `
     -d "LicDir=$Lic" -d "HasRuntimeLibraries=$HasRuntimeLibs" -d "HasRuntimeLicences=$HasRuntimeLicences" `
@@ -186,7 +186,7 @@ Remove-Item -Force -ErrorAction SilentlyContinue ([IO.Path]::ChangeExtension($Ms
 & (Join-Path $PSScriptRoot 'sign.ps1') $Msi
 
 # ---- portable zip ------------------------------------------------------------------------------
-$Portable = Join-Path $TargetDir "windows-package\filmcraft-$Version-windows-$Arch-portable"
+$Portable = Join-Path $TargetDir "windows-package\reacut-$Version-windows-$Arch-portable"
 Remove-Item -Recurse -Force $Portable -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $Portable | Out-Null
 Copy-Item (Join-Path $Stage '*.exe') $Portable
@@ -196,10 +196,10 @@ if ($HasRuntimeLibs -eq 1) {
   Copy-Item (Join-Path $Stage '*.dll') $Portable
   Copy-Item $Lic $Portable -Recurse
 }
-# The marker that makes FilmCraft keep its data in .\data next to the exe instead of %APPDATA% (#139).
+# The marker that makes Reacut keep its data in .\data next to the exe instead of %APPDATA% (#139).
 Set-Content -Encoding ascii -Path (Join-Path $Portable 'portable.txt') -Value @(
-  'FilmCraft portable: preferences, presets, logs and crash recovery are kept in the data folder',
-  'next to filmcraft.exe. Delete this file to use %APPDATA%\FilmCraft instead.'
+  'Reacut portable: preferences, presets, logs and crash recovery are kept in the data folder',
+  'next to reacut.exe. Delete this file to use %APPDATA%\Reacut instead.'
 )
 foreach ($f in 'README.md', 'LICENSE', 'LICENSE-MIT', 'LICENSE-APACHE', 'NOTICE') {
   $p = Join-Path $Root $f
@@ -217,7 +217,7 @@ if ($env:CRAFT_FONTS_DIR) {
 foreach ($dll in @('sherpa-onnx-c-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll', 'vcruntime140.dll')) {
   if (-not (Test-Path (Join-Path $Portable $dll))) { throw "the portable package is missing $dll" }
 }
-$Zip = Join-Path $Dist "filmcraft-$Version-windows-$Arch-portable.zip"
+$Zip = Join-Path $Dist "reacut-$Version-windows-$Arch-portable.zip"
 Remove-Item -Force $Zip -ErrorAction SilentlyContinue
 Compress-Archive -Path $Portable -DestinationPath $Zip
 
@@ -225,8 +225,8 @@ Compress-Archive -Path $Portable -DestinationPath $Zip
 # here; .github/workflows/windows-arm64.yml installs and runs it on ARM64 instead.
 $HostArch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
 if ($Arch -ne 'arm64' -or $HostArch -eq 'arm64') {
-  Invoke-Native 'filmcraft-cli --version' { & (Join-Path $Stage 'filmcraft-cli.exe') --version }
+  Invoke-Native 'reacut-cli --version' { & (Join-Path $Stage 'reacut-cli.exe') --version }
 } else {
-  Write-Output "skipping filmcraft-cli --version: an $Arch build doesn't run on this $HostArch machine"
+  Write-Output "skipping reacut-cli --version: an $Arch build doesn't run on this $HostArch machine"
 }
 Get-Item $Msi, $Zip | Format-Table Name, Length

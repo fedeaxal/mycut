@@ -105,7 +105,7 @@ fn orchestrate(args: &[String], o: &Opts) {
     std::fs::create_dir_all(&out).expect("output dir");
     let exe = std::env::current_exe().expect("exe");
     let machine = machine_info();
-    println!("FilmCraft bench `{label}`: {}", machine["summary"].as_str().unwrap_or(""));
+    println!("Reacut bench `{label}`: {}", machine["summary"].as_str().unwrap_or(""));
     let mut results = Vec::new();
     for name in &wanted {
         let tmp = out.join(format!(".section-{name}-{}.json", std::process::id()));
@@ -360,7 +360,7 @@ pub fn section_markdown(v: &Value) -> String {
 fn markdown(doc: &Value) -> String {
     let m = &doc["machine"];
     let mut s = format!(
-        "# FilmCraft benchmark `{}`\n\n- {}\n- repeat {} (best/median as noted), quick {}, monitor path {}\n\n",
+        "# Reacut benchmark `{}`\n\n- {}\n- repeat {} (best/median as noted), quick {}, monitor path {}\n\n",
         doc["label"].as_str().unwrap_or(""),
         m["summary"].as_str().unwrap_or(""),
         doc["repeat"],

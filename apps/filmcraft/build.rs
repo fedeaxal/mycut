@@ -1,4 +1,4 @@
-//! Windows only: embed the app icon and version info (VERSIONINFO) into `filmcraft.exe`, so it
+//! Windows only: embed the app icon and version info (VERSIONINFO) into `reacut.exe`, so it
 //! shows in Explorer, the taskbar, the Start menu and Alt-Tab.
 //!
 //! On every other target this does nothing (`winresource` is only a build-dependency on Windows
@@ -20,16 +20,16 @@ mod windows {
     pub fn embed_resources() {
         let mut res = winresource::WindowsResource::new();
         res.set_icon("../../assets/app-icon/filmcraft.ico")
-            .set("ProductName", "FilmCraft")
-            .set("FileDescription", "FilmCraft video editor")
-            .set("LegalCopyright", "Copyright (c) the FilmCraft contributors. MIT OR Apache-2.0.")
-            .set("OriginalFilename", "filmcraft.exe")
-            .set("InternalName", "filmcraft");
+            .set("ProductName", "Reacut")
+            .set("FileDescription", "Reacut video editor")
+            .set("LegalCopyright", "Copyright (c) the Reacut contributors. MIT OR Apache-2.0.")
+            .set("OriginalFilename", "reacut.exe")
+            .set("InternalName", "reacut");
         if let Err(e) = res.compile() {
             if std::env::var_os("FILMCRAFT_REQUIRE_WINRES").is_some() {
                 panic!("embedding Windows resources failed: {e}");
             }
-            println!("cargo:warning=filmcraft.exe built without icon/version resources: {e}");
+            println!("cargo:warning=reacut.exe built without icon/version resources: {e}");
         }
     }
 }
@@ -38,6 +38,6 @@ mod windows {
 #[cfg(not(windows))]
 mod windows {
     pub fn embed_resources() {
-        println!("cargo:warning=filmcraft.exe built without icon/version resources (cross-compiled from a non-Windows host)");
+        println!("cargo:warning=reacut.exe built without icon/version resources (cross-compiled from a non-Windows host)");
     }
 }

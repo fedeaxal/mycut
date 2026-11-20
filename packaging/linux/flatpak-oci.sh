@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build filmcraft as an OCI container layout and push it to GitHub Container Registry (GHCR)
+# Build reacut as an OCI container layout and push it to GitHub Container Registry (GHCR)
 # for consumption by Flatpak OCI clients (flatpak-oci-specs).
 #
 # Usage:

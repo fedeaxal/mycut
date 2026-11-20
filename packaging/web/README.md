@@ -1,4 +1,4 @@
-# Hosting FilmCraft for the web
+# Hosting Reacut for the web
 
 `filmcraft-web-<version>.zip` (from the GitHub release, or `packaging/web/package.sh`) holds a
 static site in `filmcraft-web-<version>/`:
@@ -33,7 +33,7 @@ forever. Only `index.html` needs revalidation.
   be cached, or a browser can pair an old page with new files.
 - **HTTPS:** WebGPU (and the clipboard) only work in a secure context, which means `https://`
   or `http://localhost`. Over plain HTTP elsewhere, the app falls back to WebGL2.
-- **No special isolation headers:** FilmCraft doesn't use `SharedArrayBuffer`, so it doesn't
+- **No special isolation headers:** Reacut doesn't use `SharedArrayBuffer`, so it doesn't
   need `Cross-Origin-Opener-Policy` or `Cross-Origin-Embedder-Policy`. If your site already sends
   COEP `require-corp`, also send `Cross-Origin-Resource-Policy: same-origin` (or `cross-origin`
   when the files live on a CDN) on the app's files.
@@ -57,7 +57,7 @@ Local test: `python3 -m http.server 8765` inside the folder, then open http://lo
 ```html
 <iframe
   src="https://example.com/filmcraft/"
-  title="FilmCraft video editor"
+  title="Reacut video editor"
   style="width: 100%; height: 720px; border: 0;"
   allow="fullscreen; clipboard-read; clipboard-write"
   allowfullscreen>
@@ -77,8 +77,8 @@ Local test: `python3 -m http.server 8765` inside the folder, then open http://lo
 
 ## The parent bridge (`?host=parent`)
 
-A page framing FilmCraft in a **same-origin** iframe can add `?host=parent` to the iframe's URL
-(`https://example.com/filmcraft/?host=parent`) and have FilmCraft hand its files over instead of
+A page framing Reacut in a **same-origin** iframe can add `?host=parent` to the iframe's URL
+(`https://example.com/filmcraft/?host=parent`) and have Reacut hand its files over instead of
 downloading them. The two sides talk `postMessage` with plain window messages that carry a `type`:
 
 | Message | Direction | Fields |
@@ -97,8 +97,8 @@ outside an iframe gives the normal app with downloads.
 
 ## Same-document host mode (no iframe)
 
-A host application can also run FilmCraft from its own document: it loads the wasm-bindgen module
-itself and gives FilmCraft one of its own canvases, so there is no iframe and no `?host=parent`.
+A host application can also run Reacut from its own document: it loads the wasm-bindgen module
+itself and gives Reacut one of its own canvases, so there is no iframe and no `?host=parent`.
 It opts in with `data-host="page"` on that canvas — the exact value `page` — and the canvas keeps
 the id the app looks up (`id="filmcraft_canvas"`).
 
@@ -153,23 +153,23 @@ await start("filmcraft_canvas"); // the canvas id the app renders on
   the host decides where the file goes.
 - The assets carry their build hash as a `?v=` query (as `index.html` loads them), so they can
   be cached forever.
-- FilmCraft has no user names that work could be signed with, so there is no `?author=`.
+- Reacut has no user names that work could be signed with, so there is no `?author=`.
 - An unframed page that uses `?host=parent` keeps the normal app with downloads.
   `data-host="page"` turns this mode on only when `?host=parent` is absent: if `?host=parent` is
   present it takes precedence, so a same-origin framed page uses the parent bridge, while an
   unframed or cross-origin page gets no bridge and keeps normal downloads.
 
-The messages and both transports are the shared contract of [`craft-web-host`](https://github.com/storytold/craft-libs/tree/main/crates/web-host) (storytold/craft-libs#420), the same for every Craft app: its README lists every message, including `saved`, with the compatibility notes. In `filmcraft:ready`, `version` is the contract's (`"1"`) and `appVersion` is this app's release. FilmCraft reads bytes, so a host sends `bytes`, not a `File`.
+The messages and both transports are the shared contract of [`craft-web-host`](https://github.com/storytold/craft-libs/tree/main/crates/web-host) (storytold/craft-libs#420), the same for every Craft app: its README lists every message, including `saved`, with the compatibility notes. In `filmcraft:ready`, `version` is the contract's (`"1"`) and `appVersion` is this app's release. Reacut reads bytes, so a host sends `bytes`, not a `File`.
 
 ### Trust and limits
 
-- **Who is trusted.** In page host mode the page and FilmCraft share one document, so any script on the page can drive the app: open files in it and receive what it saves. Use this mode only for a page you control. The iframe mode (`?host=parent`) answers only the parent window, on the page's own origin.
+- **Who is trusted.** In page host mode the page and Reacut share one document, so any script on the page can drive the app: open files in it and receive what it saves. Use this mode only for a page you control. The iframe mode (`?host=parent`) answers only the parent window, on the page's own origin.
 - **Files from the host are untrusted input.** An opened file goes through the same reading as one picked with File ▸ Open or dropped on the window, with the same format limits; before it is copied into the app's memory, its size is checked against the host open limit (512 MiB) and a larger file is refused, and a name is cut to 255 characters.
 - **The event and message names are the interface.** `filmcraft:ready`, `filmcraft:open`, `filmcraft:save`, `filmcraft:dirty` and `filmcraft:failed`, and the fields they carry (the same as the `?host=parent` messages), stay stable; changing one is a breaking change.
 
 ## Renderer selection and fallback flags
 
-FilmCraft renders with wgpu. It uses **WebGPU** when the browser has it and falls back to
+Reacut renders with wgpu. It uses **WebGPU** when the browser has it and falls back to
 **WebGL2** on its own. URL query flags override this, and they work on the iframe `src` too:
 
 | Flag | Effect |

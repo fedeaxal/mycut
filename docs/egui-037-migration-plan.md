@@ -1,4 +1,4 @@
-# FilmCraft — egui 0.37 migration plan
+# Reacut — egui 0.37 migration plan
 
 Current reconciliation (2026-10-25): the local tree incorporates main
 `a504f3c5adc4cd60d9c1120916cddb50c9b24b86`. Managed CI
@@ -51,12 +51,12 @@ is a disposition index only; it does not override any section.
 | Research candidate | `aiongg/egui` `craft/0.37` = `a4f9a17f64a6bae61350fb85804c9df0d9865916`; `aiongg/winit` `craft/0.30.13-lang` = `8b35388bd719e8cc86a95971ba0bc026c9a8f058` |
 | Production fork pins | **Unknown and deliberately not invented.** They become valid only after reviewed, published immutable `storytold/egui` and `storytold/winit` commits exist. See §3.2 and §15 gate G-PINS. |
 | Evidence directory | `/home/codex/work/ssd2/task-evidence/egui037-migration-20261022` |
-| Historical diagnostics | `/home/codex/work/ssd2/task-evidence/egui037-audit-20261022/{fork,stock}/filmcraft.errors` — older checkout (FilmCraft manifest 0.10.0), clues only, never acceptance |
+| Historical diagnostics | `/home/codex/work/ssd2/task-evidence/egui037-audit-20261022/{fork,stock}/filmcraft.errors` — older checkout (Reacut manifest 0.10.0), clues only, never acceptance |
 
 The existing `App::logic` / `App::ui` split and root-`Ui` architecture are **not** introduced
 by 0.37 and must not be rewritten as if they were. This plan changes where frame side effects
 run and how input is handled across layout passes; it does not change the command, undo,
-project or persistence model. Do not add a FilmCraft-specific `egui` compatibility crate. Use
+project or persistence model. Do not add a Reacut-specific `egui` compatibility crate. Use
 the new APIs directly, and add a helper to `craft-ui` only for semantics that at least two
 consumers need with the same contract.
 
@@ -81,17 +81,17 @@ This repository has:
 
 EffectCraft (`9581b53c3f8945683252af0eb5fac79e0e43aed4` in the owned checkout) pins fifteen
 `filmcraft-*` crates to `2c5ba7a72619935f0481f99d59409e0d1844b234` in `effectcraft/Cargo.toml`.
-That revision is not an ancestor of FilmCraft baseline `abf44fda`; it is reachable from
+That revision is not an ancestor of Reacut baseline `abf44fda`; it is reachable from
 `origin/effectcraft/webm-alpha`. None of those crates (`media`, `codecs`, `frame`, `color`,
 `time`, `project`, `interchange`, `geom`, the encoders/decoders and the muxer) contains
 `egui`, and EffectCraft does not depend on `filmcraft-ui-egui`.
 
 Decision: EffectCraft needs no change for this migration. Retain its separate branch pin.
-Re-audit only if (a) the pin moves to FilmCraft main or another revision that changes a
+Re-audit only if (a) the pin moves to Reacut main or another revision that changes a
 shared public type, or (b) EffectCraft starts consuming `filmcraft-ui-egui` (directly or
 through another crate). The re-audit must check the actual Cargo identities, not just a
 version string. This is the required explicit cross-repository check; it is not a silent
-deferral of FilmCraft's own compatibility work.
+deferral of Reacut's own compatibility work.
 
 ## 2. Current architecture and lifecycle
 
@@ -114,7 +114,7 @@ deferral of FilmCraft's own compatibility work.
 - `crates/ui-egui/src/lib.rs:2193` `impl eframe::App for FilmcraftApp::ui`;
 - `crates/ui-egui/src/lib.rs:1807` private `FilmcraftApp::frame(&mut self, ui: &mut egui::Ui)`,
   called from `App::ui` and wrapped in `catch_unwind`;
-- `cargo xtask` only builds/tests; FilmCraft does not implement a second `update` path;
+- `cargo xtask` only builds/tests; Reacut does not implement a second `update` path;
 - the main workspace is custom-drawn: `App::ui` receives the root `Ui`, then calls
   `header::show`, `dock_area`, `panels::*` and dialog functions. It does not use
   `egui::TopBottomPanel`, `SidePanel` or `CentralPanel`;
@@ -168,10 +168,10 @@ rows above.
 
 ### 2.4 Actual multi-pass exposure
 
-- FilmCraft does not call `Context::request_discard` (verified by grep).
-- egui 0.37 components used by FilmCraft can request it: `Grid` on first show
+- Reacut does not call `Context::request_discard` (verified by grep).
+- egui 0.37 components used by Reacut can request it: `Grid` on first show
   (`crates/egui/src/grid.rs`, "new Grid" path), `Aligned` on size change
-  (`containers/aligned.rs`), and `Resize` on a sizing pass (`containers/resize.rs`). FilmCraft
+  (`containers/aligned.rs`), and `Resize` on a sizing pass (`containers/resize.rs`). Reacut
   uses `Grid` in many dialogs, `ResizeHandle` through `craft_ui::layout`, and `Aligned` only if
   a dependency introduces it.
 - Both native `crates/eframe/src/native/epi_integration.rs::update` and web
@@ -208,7 +208,7 @@ rows above.
 - The local `origin/main` ref (`b1401e3`) is stale. A stale remote-tracking ref **does not
   prove** that `4919088` is unpublished. The review's "unpublished local/audit branch" claim
   is rejected; the corrected evidence is the GitHub main verification above.
-- FilmCraft's current manifest pins `craft-ui` at
+- Reacut's current manifest pins `craft-ui` at
   `5c874d51eeb3de70e735c8ce87a59a7dedd47675`, `craft-media` at
   `f0ad6c1e1d297908915f4be315b0fcfc9be7b5d4`, and `craft-docpath` separately at
   `82a24b006eefa036b43c09a67fb9a3fbd17ffe63`. The old `5c874d51` commit was fetched exactly
@@ -220,7 +220,7 @@ rows above.
   - The docking change is the protected-group fix: `MoveFloating` now requires every
     floating-group member to be movable, including the resize grip. Preserve the tests from
     `d66e345`, `fd9cf54` and `c67b1e1`; this intentional security behavior must not be
-    reverted to match the old FilmCraft baseline.
+    reverted to match the old Reacut baseline.
   - Printing is additive and lazy. Enabling the updated crate must not start discovery at
     startup. Relevant print commits include `b700ae7`, `d27646a`, `4cae45d`, `2bbef53` and
     `4f85efb`.
@@ -233,7 +233,7 @@ rows above.
   `1764bca`, applied onto current `4919088`. Preserve intervening fixes and provenance.
   Never merge `b68de8c` or `ec8840a` as a tree.
 - The shared 0.37 port and the CL-2 capture helper will produce a later published
-  `craft-libs` revision. FilmCraft's final compatibility review must compare its actual old
+  `craft-libs` revision. Reacut's final compatibility review must compare its actual old
   API/use sites against that final published revision, not against `b68de8c` or a branch
   point.
 
@@ -259,10 +259,10 @@ pins. Gate G-PINS (§15) blocks the entire landing stage until:
 4. the exact SHAs, feature sets, provenance and test mappings are recorded in the suite pin
    manifest and the ledger.
 
-Until then, no `[patch]` block in FilmCraft names a fabricated or guessed revision. The
+Until then, no `[patch]` block in Reacut names a fabricated or guessed revision. The
 eventual block must name the same immutable revision for every egui-family package that can
 resolve, plus `winit`; a patch section inside `craft-libs` does not propagate into this root.
-`egui_extras` is unused. `egui_plot` does not exist in FilmCraft; do not add it because its
+`egui_extras` is unused. `egui_plot` does not exist in Reacut; do not add it because its
 version numbering differs. `winit` stays exactly `0.30.13`.
 
 The final production manifest will look like the following shape, with `REPLACE_WITH_*`
@@ -299,11 +299,11 @@ strongly and the callback holds it weakly.
    exercises multiple viewports; GridCraft exercises a single window. Their tokens, paths,
    settle delays, deadlines and replies remain app-owned.
 3. **CL-2F** freezes the helper API after joint review of those adapters.
-4. **FilmCraft and the other consumers** pin the published revision containing CL-1 and
+4. **Reacut and the other consumers** pin the published revision containing CL-1 and
    CL-2F in one atomic dependency stage, not a branch head and not a path dependency.
 
 All fourteen capture consumers adopt this contract. The eleven apps that already declare
-`craft-ui` (CADCraft, DesignCraft, EffectCraft, FilmCraft, GridCraft, LightCraft, PdfCraft,
+`craft-ui` (CADCraft, DesignCraft, EffectCraft, Reacut, GridCraft, LightCraft, PdfCraft,
 PhotoCraft, SoundCraft, VectorCraft and WordCraft) import the helper from the published
 revision that contains both CL-1 and CL-2F in the same atomic dependency stage. DesignCraft
 and GridCraft are the pilot adapters against the reviewed CL-2 provisional revision before
@@ -454,7 +454,7 @@ one gesture yielding one command/undo.
 ### 4.3 Do not use `Context::root_ui` recursively
 
 `Context::root_ui` panics if called while `App::ui`/`Context::run_ui` already holds the root
-`Ui` (upstream #8535). FilmCraft does not need it. Keep passing the existing `&mut egui::Ui`
+`Ui` (upstream #8535). Reacut does not need it. Keep passing the existing `&mut egui::Ui`
 to `header::show`, `dock_area`, `panels::*` and dialogs. Where a helper takes
 `&egui::Context` only to add widgets, change it to take `&mut egui::Ui` (or return an
 action/shape), not a `Context` bridge.
@@ -462,7 +462,7 @@ action/shape), not a `Context` bridge.
 ### 4.4 Multi-pass actions: no clearing on a no-event pass
 
 Immediate mode plus `request_discard` means a UI handler can run in a pass whose output is
-discarded. FilmCraft's project mutations must run once, and must not be lost.
+discarded. Reacut's project mutations must run once, and must not be lost.
 
 Design:
 
@@ -656,18 +656,18 @@ closures.
 
 ### 5.6 `Id::new` and `Ui::id`
 
-0.37 deprecates `Id::new` and `Ui::id` (`Id::unique` / `Ui::scope_id`). FilmCraft has 403
+0.37 deprecates `Id::new` and `Ui::id` (`Id::unique` / `Ui::scope_id`). Reacut has 403
 `Id::new` occurrences across `crates/ui-egui/src` and tests. Under `clippy -- -D warnings`,
 deprecation is a hard failure.
 
 - `egui::Id::new(x)` -> `egui::Id::unique(x)` for every root id; same hash, same identity.
 - `Id::new(parent).with(child)` -> `Id::unique(parent).with(child)`.
-- `UiBuilder::id(x)` -> `UiBuilder::scope_id(x)`; FilmCraft uses `id_salt` and has no
+- `UiBuilder::id(x)` -> `UiBuilder::scope_id(x)`; Reacut uses `id_salt` and has no
   `UiBuilder::id` (verified), but `craft-ui` PR #199 performs its own conversion.
-- `Ui::id()` -> `Ui::scope_id()`; FilmCraft has no `ui.id()` call (verified).
+- `Ui::id()` -> `Ui::scope_id()`; Reacut has no `ui.id()` call (verified).
 - Keep `id_salt` for child UIs; do not replace every `id_salt` with a global id.
 
-Add a grep-based CI check that no `Id::new(` remains in FilmCraft or its tests.
+Add a grep-based CI check that no `Id::new(` remains in Reacut or its tests.
 
 ### 5.7 `Event::PasteImage`
 
@@ -677,7 +677,7 @@ Add a grep-based CI check that no `Id::new(` remains in FilmCraft or its tests.
 `Event::Paste`. Add tests alongside `ctrl_c_x_v_become_key_presses`.
 
 The native app’s `clipboard_media` hook (arboard) still supplies files/images to the Paste
-command. On wasm, either keep the existing “FilmCraft clips only” path or extend
+command. On wasm, either keep the existing “Reacut clips only” path or extend
 `ClipboardMedia` with the `PasteImage` bytes; that is a separate feature decision. Do not
 double-read the clipboard if the event already carries an image.
 
@@ -692,7 +692,7 @@ matches at `lib.rs:1753` and `lib.rs:2100`.
   §6.1).
 - `clipboard` opt-in in eframe/egui-winit: native feature added (§3.5).
 - `Id` deprecations (§5.6).
-- `Panel` constructors take `impl AsIdSalt`: FilmCraft does not use `egui::Panel`, but
+- `Panel` constructors take `impl AsIdSalt`: Reacut does not use `egui::Panel`, but
   `craft-ui` and any new panel code must use the new form.
 - `UiBuilder::scope_id`: see PR #199.
 - `ComboBox` is built from atoms and takes `IntoAtoms`; existing `selected_text`/`show_ui`
@@ -715,7 +715,7 @@ Mono, then appends Japanese craft-fonts (`add_craft_fonts`), Chinese (`cjk::inst
 (`rtl::install`). Keep that order.
 
 The explicit `default_fonts` feature preserves egui’s built-in fallback, but in 0.37 the
-monochrome emoji faces moved behind `monochrome_emoji_fonts`. Enable it explicitly. FilmCraft
+monochrome emoji faces moved behind `monochrome_emoji_fonts`. Enable it explicitly. Reacut
 starts from `FontDefinitions::default()` and uses `✔ ✓ ✖ ⚡ ⚠ ⚙ ♪ ☑` (20 occurrences across
 10 files); with `system_fonts` off, those symbols can otherwise become tofu or switch to a
 platform face. Add a glyph-coverage assertion for exactly these characters plus a screenshot
@@ -731,7 +731,7 @@ the matching i18n source keys and translation rows, and the mixer post-fader ins
 (`▸ ` → `> `). One `# View ▸ Reset Interface Zoom` header comment in each language file was
 updated for consistency; Rust doc comments were left unchanged.
 
-This is deliberate tofu avoidance. FilmCraft installs Inter at the front of the proportional
+This is deliberate tofu avoidance. Reacut installs Inter at the front of the proportional
 family and `FontDefinitions::default()` then falls back to Ubuntu-Light, egui-icons and the
 monochrome emoji faces; none of those contains U+25B8 (verified from each bundled font's
 `cmap`), and `system_fonts` stays disabled, so proportional menu-path text could show a
@@ -746,7 +746,7 @@ system scan; do not call `filmcraft_text::fonts::scan_system()` in a UI pass.
 `eframe` 0.37 adds an optional `system_fonts` feature (fontique provider, #8512) and a
 `system_font_fallback` option. **Do not enable it in the migration.** It changes startup cost
 and the fallback face chosen for a missing glyph; the current explicit CJK/RTL fallback is
-part of FilmCraft’s visual contract. Record it as an opt-in follow-up with measured startup
+part of Reacut’s visual contract. Record it as an opt-in follow-up with measured startup
 and glyph coverage, especially for color emoji; do not accept clamp-only as a substitute for
 texture wrap/filter semantics.
 
@@ -772,7 +772,7 @@ OS/font inventory recorded, not pixel-golden input.
 
 ### 6.2 UI language and AccessKit language
 
-FilmCraft’s `i18n::Language` is a private list (`crates/ui-egui/src/i18n/mod.rs`,
+Reacut’s `i18n::Language` is a private list (`crates/ui-egui/src/i18n/mod.rs`,
 `Language::ALL`; 12 languages, no Arabic/Hebrew UI). Add `Language::bcp47()` returning proper
 tags (`en`, `ja`, `es`, `pt-BR`, `uk`, `zh-CN`, `de`, `ru`, `fr`, `id`, `it`, `ko`). Call
 `ctx.set_language(Some(tag))` when the language changes and `frame.set_ui_language(Some(tag))`
@@ -780,7 +780,7 @@ in `App::ui` (fork E18) so the AccessKit root and the web hidden IME input use t
 In kittest, `Frame::set_ui_language` is a no-op; the `ctx.set_language` call is the tested
 path.
 
-Do not enable `Style::right_to_left` (fork E9) yet: FilmCraft offers no RTL interface
+Do not enable `Style::right_to_left` (fork E9) yet: Reacut offers no RTL interface
 language, and mirroring the custom-drawn workspace without a full RTL audit would be worse
 than leaving it LTR. Document RTL UI as a future feature gated on real translated layouts.
 
@@ -806,7 +806,7 @@ In P1, in the same stage that pins the fork, change `rtl::Lines`:
 The fork's E5/E12 path and the removal of the manual reversal must ship in the same P1
 commit set; there is no intermediate state with both active. A negative regression first
 demonstrates the double ordering (Arabic caption with the fork produces reversed words), then
-P1 removes it. Test `"كلمة أخرى"`, `"قال FilmCraft 0.6 جيد"`, Arabic-Indic digits, brackets
+P1 removes it. Test `"كلمة أخرى"`, `"قال Reacut 0.6 جيد"`, Arabic-Indic digits, brackets
 and an LTR paragraph containing an RTL phrase; assert the leftmost drawn glyph of the first
 visual word, not just “some Arabic glyph exists”.
 
@@ -842,7 +842,7 @@ The candidate has a confirmed gap: winit W27 exposes
 
 This migration therefore requires **E21b/P7b** before acceptance. The authoritative
 contract is the complete E21b section of `egui/docs/egui-037-migration-plan.md` plus
-`winit-review-triage.md`; these bullets are FilmCraft's adoption summary, not a weaker
+`winit-review-triage.md`; these bullets are Reacut's adoption summary, not a weaker
 restatement:
 
 - `IMEOutput` carries one atomic descriptor: owner/context-generation identity plus the
@@ -877,15 +877,15 @@ restatement:
   IME-owner change, per window and owner; macOS NSRange conversion remains a separate W26
   path, not a claim of a new macOS API.
 
-FilmCraft’s own custom `IMEOutput` producer is at
+Reacut’s own custom `IMEOutput` producer is at
 `crates/ui-egui/src/panels/graphics.rs:933-940`. It must supply the logical model text, the
 preedit, and UTF-8 byte cursor/anchor ranges from its own scalar/grapheme coordinates; it must
 not pass display-bidi text or a `None` placeholder. Its integration test must reject a
 split-UTF-8 range and verify the model range maps to the emitted byte range. Built-in
-`TextEdit` consumers in FilmCraft (caption, notes, search, metadata) inherit the producer and
+`TextEdit` consumers in Reacut (caption, notes, search, metadata) inherit the producer and
 need tests rather than custom adapters; the same inheritance applies to LightCraft’s built-in
 consumers. The suite inventory of custom producers is WordCraft `canvas.rs` (two),
-VectorCraft `canvas.rs`, FigCraft `shortcuts.rs`, EffectCraft `viewer_text.rs`, FilmCraft
+VectorCraft `canvas.rs`, FigCraft `shortcuts.rs`, EffectCraft `viewer_text.rs`, Reacut
 `graphics.rs`, DesignCraft `canvas.rs`, DeckCraft `canvas.rs` and PhotoCraft `type_tool.rs`;
 each needs its own adapter and test.
 
@@ -940,7 +940,7 @@ W15P:
   regular `wl_data_device`.
 - Egui 0.37 `get_primary`/`set_primary` routes through that path. E4 preserves password
   exclusion and does not reclaim ownership for an unchanged selection.
-- FilmCraft also uses `arboard` directly for files/images (`apps/filmcraft/src/main.rs`
+- Reacut also uses `arboard` directly for files/images (`apps/filmcraft/src/main.rs`
   `clipboard_media`). The arboard/smithay PRIMARY path is a measured fallback only if the
   winit path cannot meet a proven requirement; it is not the planned end state and it is not
   accepted merely by documenting a GNOME limitation.
@@ -993,8 +993,8 @@ with supported capabilities recorded:
 - GPU: `FilmcraftApp::set_wgpu` receives `CreationContext::wgpu_render_state`;
   `TextureHandle` and `GpuState`/`uploadedBytes` remain. `egui-wgpu` fork E2/E3 add surface
   fitting and error scopes; they are relevant to large/odd windows. Do not change the
-  FilmCraft `wgpu 30.0.1` pin or the GPU compositor in the migration PR. The candidate’s own
-  lock resolves `wgpu 30.0.0`; FilmCraft’s lock is authoritative. Record the actual resolved
+  Reacut `wgpu 30.0.1` pin or the GPU compositor in the migration PR. The candidate’s own
+  lock resolves `wgpu 30.0.0`; Reacut’s lock is authoritative. Record the actual resolved
   version and prove there is one source; do not claim the candidate lock’s version.
   `perf.stats` `gpu.uploadedBytes`, transitions, `submitMs` and frame-cache counters are the
   upload/GPU observables.
@@ -1028,7 +1028,7 @@ Migration rules:
 
 ## 10. Fork and vendor patch provenance
 
-FilmCraft has no vendor directory. The suite forks carry behavior that FilmCraft either uses
+Reacut has no vendor directory. The suite forks carry behavior that Reacut either uses
 or must consciously not use. Keep the pins; do not delete unrelated fixes. The tables below
 name the aiongg research candidate for provenance only; production pins are G-PINS.
 
@@ -1038,13 +1038,13 @@ name the aiongg research candidate for provenance only; production pins are G-PI
 |---|---|---|
 | E2+E3 egui-wgpu surface fit/error scopes | Keep; use for large windows and odd surfaces | Windows/Linux resize/VM; `ui.resize` to a large size; no `Wgpu` error |
 | E4 Wayland clipboard/PRIMARY | Keep; must be paired with W15P; the filmcraft#1115 problem is exactly this | Hyprland/KWin/Mutter copy/paste, PRIMARY matrix, file/image paste |
-| E5, E8, E12, E13, E14, E15, E16, E17, E20 | Keep; use them; remove FilmCraft’s manual bidi | Arabic/Hebrew captions, editing, alignment, screenshots |
+| E5, E8, E12, E13, E14, E15, E16, E17, E20 | Keep; use them; remove Reacut’s manual bidi | Arabic/Hebrew captions, editing, alignment, screenshots |
 | E6, E21 IME | Keep; E21 alone is incoming only; E21b is mandatory | native IME rows plus outgoing-state tests |
 | E7, E19 non-Latin shortcuts and P7 held-key pairing | Keep; adapt `handle_shortcuts` to Latin-layout chars; retain the emitted egui key identity for a held physical key across layout/modifier changes and clear it on focus loss/IME/destruction | kittest + native layouts, repeat/unidentified keys |
 | E9 RTL UI mirroring | Keep in fork but do not enable `Style::right_to_left` | no RTL UI language yet |
 | E10 web key/lang fixes | Keep; test browser IME and named keys | `smoke.mjs` + manual browser |
-| E11 vello_cpu multithreading | Not exercised by FilmCraft; no local feature change | none |
-| E1 viewport hooks | Not used by FilmCraft; keep the fork patch | no FilmCraft test |
+| E11 vello_cpu multithreading | Not exercised by Reacut; no local feature change | none |
+| E1 viewport hooks | Not used by Reacut; keep the fork patch | no Reacut test |
 | E18 `Frame::set_ui_language` | Use with `ctx.set_language` | language switch + AccessKit root |
 | E15 `LineBreaker`/`LayoutJob::language` | Optional; use only if document line breaking needs it | caption wrapping tests |
 | E21b/P7b outgoing IME surrounding text (P7b) | **Required new prerequisite**: the complete shared owner/support/serial contract, 4000-byte bounded payload without a full-document copy, TextEdit producer, Film graphics adapter and Wayland delivery | §7.2 tests; native Wayland trace |
@@ -1056,7 +1056,7 @@ reason and removal condition.
 ### 10.2 `aiongg/winit` `craft/0.30.13-lang` (`8b35388b`, research)
 
 Keep the whole pinned branch because E4/E19/E21/E21b require W15/W15P/W25/W26/W27,
-including the bounded W15P transfer path and the W27 owner/support lifecycle. For FilmCraft,
+including the bounded W15P transfer path and the W27 owner/support lifecycle. For Reacut,
 exercise at least:
 
 - W1 mixed-DPI window rect; W3/W4 Windows IME/hidden maximized; W5/W20/W21 X11 IME;
@@ -1064,7 +1064,7 @@ exercise at least:
   W15 Wayland drops/clipboard; W15P PRIMARY; W18/W19 Windows IME; W22-W27 language/IME.
 - W15P is required with E4 as described in §7.3, including per-seat lifecycle, password
   exclusion, unchanged-owner behavior and slow/canceled transfer tests.
-- W14 macOS cancelable termination is opt-in; FilmCraft does not call that platform extension,
+- W14 macOS cancelable termination is opt-in; Reacut does not call that platform extension,
   and its own close interception remains.
 - Do not enable W16 pinch/rotation or tablet input; no `craft-tablet` dependency exists.
 
@@ -1127,12 +1127,12 @@ missing, fix the widget or fixture.
 **Font features do not propagate through kittest.** `egui_kittest`'s normal `[dependencies]
 egui` uses `default-features = false`; only kittest's own `[dev-dependencies]` enable
 `default_fonts` and `monochrome_emoji_fonts`, and a dependency's dev-dependencies do not
-propagate into a consumer. Every kittest/FilmCraft test root that needs the bundled faces must
+propagate into a consumer. Every kittest/Reacut test root that needs the bundled faces must
 enable those egui features explicitly or install controlled fonts, and each actual graph must
 be inspected. The production feature policy in §3.5 does not reach the harness by itself.
 
 Windows uses a uniquely owned clone and the VM run/status/finish workflow, with the clone’s
-`Build-DesignCraft.ps1` equivalent for FilmCraft or the repository’s documented build helper.
+`Build-DesignCraft.ps1` equivalent for Reacut or the repository’s documented build helper.
 The baseline VM is not adopted or reused across tasks.
 
 ### 11.2 UI, lifecycle and workflow tests
@@ -1200,7 +1200,7 @@ New/extended assertions:
 ### 11.3 Visual comparisons and tolerances
 
 Do not add committed screenshots unless they are needed; if added, they are original
-FilmCraft captures and need `.attribution` sidecars and `ATTRIBUTION.md` rows
+Reacut captures and need `.attribution` sidecars and `ATTRIBUTION.md` rows
 (`cargo xtask assets`). Prefer writing review PNGs to the durable evidence directory.
 
 For before/after review:
@@ -1226,7 +1226,7 @@ python3 /home/codex/work/maintenance/task.py run \
   --task filmcraft-egui037-migration \
   --source /home/codex/work/CraftApps/egui037-migration-20261022/filmcraft-implementation \
   --evidence /home/codex/work/ssd2/task-evidence/egui037-migration-20261022/filmcraft \
-  -- cargo run --release -p filmcraft -- --control 9876
+  -- cargo run --release -p reacut -- --control 9876
 python3 /home/codex/work/maintenance/task.py status filmcraft-egui037-linux-ui-01 --tail-bytes 8192
 # after the UI workflow, evidence capture and review:
 python3 /home/codex/work/maintenance/task.py finish filmcraft-egui037-linux-ui-01 \
@@ -1327,7 +1327,7 @@ that an upstream regression is unavoidable.
 
 ### 12.3 Predefined thresholds and noise policy
 
-These are the shared suite minimums; FilmCraft may tighten them, never silently loosen them.
+These are the shared suite minimums; Reacut may tighten them, never silently loosen them.
 The stock-0.37 equivalent control and the first baseline report are required before any
 regression claim; thresholds and goldens are never auto-widened or auto-blessed to make a run
 pass.
@@ -1341,7 +1341,7 @@ pass.
   explanation.
 - **Playback CPU** (`bench-playback` CPU ms/frame, worker/source columns): ≤ +3% median;
   shown/dropped may vary with load and is not a gate alone.
-- **Peak RSS:** FilmCraft gate is ≤ +5% for the same scenario after subtracting the measured
+- **Peak RSS:** Reacut gate is ≤ +5% for the same scenario after subtracting the measured
   noise floor; investigate any repeatable increase above the floor. Report absolute MB.
 - **Idle:** no extra repaint requests and no extra CPU when nothing is playing; a hidden window
   keeps auto-save/playback semantics without busy-looping.
@@ -1411,16 +1411,16 @@ uses the preserved baseline executable/source and a separate managed allocation.
 - `cargo xtask wasm` must still check `filmcraft-ui-egui` and `filmcraft-web`; `egui_kittest`
   is a dev dependency and remains native-only.
 - The web crate’s `wasm-bindgen` exact pin (`=0.2.129`) must match the installed CLI. The
-  candidate’s own lock uses `wasm-bindgen 0.2.126` and `web-sys 0.3.103`; FilmCraft currently
+  candidate’s own lock uses `wasm-bindgen 0.2.126` and `web-sys 0.3.103`; Reacut currently
   pins `web-sys 0.3.106` and `wasm-bindgen 0.2.129`. The `0.2`/`0.3` ranges are compatible,
-  but the final FilmCraft lock is authoritative: record the resolved versions and run
+  but the final Reacut lock is authoritative: record the resolved versions and run
   `wasm-bindgen --version` before `cargo xtask web`.
 - `rfd 0.17`, `arboard 3.6.1`, `wgpu 30.0.1`, `accesskit 0.25`/`0.24` transitive and `winit
   0.30.13` compatibility were checked from manifests; a fresh `cargo metadata --locked` and a
   clean lockfile resolution are still required.
-- The candidate’s own lock resolves `wgpu 30.0.0`; FilmCraft pins 30.0.1. Record the actual
-  resolved candidate/FilmCraft version in the evidence and ensure one source; do not claim the
-  candidate lock is FilmCraft’s.
+- The candidate’s own lock resolves `wgpu 30.0.0`; Reacut pins 30.0.1. Record the actual
+  resolved candidate/Reacut version in the evidence and ensure one source; do not claim the
+  candidate lock is Reacut’s.
 - New 0.37 dependencies include `wl-clipboard-rs`, `tree_magic_mini`, `petgraph`, `nom`,
   `send_wrapper`, `unicode-properties`, `vello_cpu 0.2`, `glifo 0.3`, `kittest 0.5` and updated
   `accesskit*`/`phf`. Review their licences (all expected MIT/Apache-2.0/BSD/ISC); no GPL/LGPL
@@ -1442,11 +1442,11 @@ not a passing result.
    The exact SHAs, feature sets and provenance must be recorded before P1.
 2. **G-CL2F — shared capture helper.** `craft-libs` must publish the CL-2 helper, DesignCraft
    and GridCraft adapters must be reviewed against it, and CL-2F must freeze the API before
-   FilmCraft pins the revision. A branch head or path dependency is not acceptable.
+   Reacut pins the revision. A branch head or path dependency is not acceptable.
 3. **G-CRAFT-LIBS — shared baseline and port.** The final published `craft-libs` revision must
    build on the merged PR #199 base `3832c47ef68a0e6214f2c1e85f3526b6adcb686e` with the
    protected-group docking fix and lazy printing preserved; the PR-199 hunks
-   (`8614e4a`/README `1764bca`) are historical provenance. `5c874d51` is the old FilmCraft
+   (`8614e4a`/README `1764bca`) are historical provenance. `5c874d51` is the old Reacut
    manifest pin; `4919088` is historical GitHub main. `craft-docpath` stays at `82a24b0`
    unless a concrete cross-type reason appears.
 4. **G-IME — native IME and E21b.** E21b/P7b must exist in the pinned fork with the complete
@@ -1454,7 +1454,7 @@ not a passing result.
    and explicitly sent, committed W27 disable/enable transitions with cache clear,
    authoritative completed-pass `None`, current-epoch serial-mismatch edits applied once with
    outgoing state deferred, and a 4000-byte payload extracted without a full-document copy.
-   The FilmCraft graphics adapter must supply logical model/preedit/UTF-8 bytes, and Windows
+   The Reacut graphics adapter must supply logical model/preedit/UTF-8 bytes, and Windows
    Japanese/Korean, X11 Vietnamese, Wayland text-input-v3 and macOS rows must run on real
    environments. No headless test is a substitute. macOS without hardware is explicitly
    unresolved.
@@ -1565,7 +1565,7 @@ This table is an index; the body sections above are authoritative.
   `/home/codex/work/CraftApps/egui037-migration-20261022/{egui,winit}`.
 - Shared migration: `storytold/craft-libs#199` (port hunks `8614e4a`, README `1764bca`;
   stale heads `b68de8c`/`ec8840a` are not mergeable trees), current main `4919088`, old
-  FilmCraft pin `5c874d51`, language work `storytold/craft-libs#198`.
+  Reacut pin `5c874d51`, language work `storytold/craft-libs#198`.
 - Local evidence: `/home/codex/work/ssd2/task-evidence/craft-fork-plan-20261020/PLAN.md`,
   `/home/codex/work/ssd2/task-evidence/craft-fork-ai-lines-20261022/SURVEY.md`,
   `/home/codex/work/ssd2/task-evidence/craft-fork-egui037-20261021/RESULTS.md`,

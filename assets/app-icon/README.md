@@ -36,7 +36,7 @@ the drawing to the three-colour palette and traces the ink. Licence: [LICENSE.tx
 | `filmcraft-macos-512.png` | runtime Dock icon on macOS (embedded by `apps/filmcraft/src/main.rs`) |
 | `filmcraft.icns` | macOS bundle icon (`CFBundleIconFile`) |
 | `filmcraft.ico` | Windows icon, 16–256 px (embedded in `filmcraft.exe` by `apps/filmcraft/build.rs`) |
-| `hicolor/<size>/apps/ai.storyteller.filmcraft.png`, `hicolor/scalable/…svg` | Linux icon theme, used by `packaging/linux/ai.storyteller.filmcraft.desktop` |
+| `hicolor/<size>/apps/ai.storyteller.filmcraft.png`, `hicolor/scalable/…svg` | Linux icon theme, used by `packaging/linux/io.github.fedeaxal.reacut.desktop` |
 
 The web app's `apps/filmcraft-web/web/favicon.png` (128 px) comes from the same artwork.
 

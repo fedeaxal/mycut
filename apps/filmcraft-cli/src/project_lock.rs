@@ -75,11 +75,11 @@ fn lock(project: &Path, waiting: impl FnOnce()) -> std::io::Result<File> {
 pub fn for_save(a: &Args) -> Option<File> {
     let project = saved_in_place(a).unwrap_or_else(|e| crate::fail(e))?;
     let shown = project.display();
-    let waiting = || crate::diag(format_args!("filmcraft-cli: waiting for another run saving {shown}"));
+    let waiting = || crate::diag(format_args!("reacut-cli: waiting for another run saving {shown}"));
     match lock(project, waiting) {
         Ok(file) => Some(file),
         Err(e) => {
-            crate::diag(format_args!("filmcraft-cli: warning: can't lock {shown} ({e}); another run saving it now could overwrite these edits"));
+            crate::diag(format_args!("reacut-cli: warning: can't lock {shown} ({e}); another run saving it now could overwrite these edits"));
             None
         }
     }

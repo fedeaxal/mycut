@@ -1,6 +1,6 @@
 # Contributors in the About window
 
-**About ▸ Contributors** credits everyone who contributed to FilmCraft, and **About ▸ Models** credits
+**About ▸ Contributors** credits everyone who contributed to Reacut, and **About ▸ Models** credits
 the AI models named in `Co-Authored-By` trailers.
 
 ## Decision
@@ -20,9 +20,9 @@ the AI models named in `Co-Authored-By` trailers.
   first or last commit date. The name toggle cycles **Username → Display name → Real name**; a
   missing name falls back to `@username`. Alphabetical sorting is case-insensitive and ignores the `@`.
 
-## In FilmCraft
+## In Reacut
 
-- The About window is in `crates/ui-egui/src/panels/dialogs.rs` (Help ▸ About FilmCraft, `app.about`); automation ids `about.tab.*` and `about.credits.*`.
+- The About window is in `crates/ui-egui/src/panels/dialogs.rs` (Help ▸ About Reacut, `app.about`); automation ids `about.tab.*` and `about.credits.*`.
 
 ## Credit yourself
 

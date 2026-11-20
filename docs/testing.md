@@ -3,8 +3,8 @@
 ```sh
 cargo test --workspace                          # everything; oracle tests skip without ffmpeg
 cargo nextest run --workspace                   # the same in parallel processes (doctests: cargo test --doc)
-cargo test -p filmcraft-h264                    # one crate
-cargo test --release -p filmcraft-hevc          # codec tests are much faster in release
+cargo test -p reacut-codecs                   # one crate
+cargo test --release -p craft-video --features prores,threads --test prores  # run from the craft-libs workspace
 cargo xtask ci                                  # all gates (fmt, clippy, tests, layers, assets, wasm)
 cargo xtask fixtures                            # pre-generate the ffmpeg fixture matrix
 FILMCRAFT_REQUIRE_ORACLES=1 cargo test --workspace   # CI: missing ffmpeg fails instead of skipping
@@ -15,7 +15,7 @@ Integration tests build one binary per crate: a crate with several test files ke
 line in `main.rs`; shared helpers live in `tests/it/common/` or `tests/it/support/`. A test file that
 changes process-wide state (a global switch, pool, panic hook or fault injection) or times a workload
 stays a binary of its own in `tests/`. Select one file's tests with its module path:
-`cargo test -p filmcraft-h264 --test it conformance::`.
+`cargo test -p reacut-codecs --test it mxf_oracle::`.
 
 ## 1. Kinds of tests
 
@@ -30,6 +30,7 @@ stays a binary of its own in `tests/`. Select one file's tests with its module p
 | Scopes and panels (M8.9 / M12.6) | `crates/scopes/src/tests.rs`, `crates/engine/src/{scopes,panels}_tests.rs`, `crates/ui-egui/tests/it/panels_ui.rs` | scope maths on generated frames (flat colours → exact histogram bins, ramps → waveform row = code value, 75 % bars → parade levels and vectorscope target cells for BT.601/709/2020, HLS hue angles, YC chroma, Clamp Signal, decimation, NaN); `scopes.read` on a colour matte (exact bins, 78.43 %) and on Bars and Tone (the six targets); metadata edits (one undo step, read-only fields refused, saved in the project), the event log (failed / disabled commands, repeats, jobs started / finished / failed / cancelled); every panel from Window ▸, the scopes' wrench menu, presets, five-scope grid, typing into a Metadata field, Timecode rows and modes, Events filter / Clear All, Progress cancel, Reference Monitor park / gang / scopes (`FILMCRAFT_UI_SNAPSHOT_DIR=<dir>` writes `panels-*.png`); `perf_scopes_at_1080p` (ignored) times each scope |
 | Keyframe navigator and Effect Controls ruler | `crates/engine/src/tests.rs` (`add_keyframe_toggles_the_keyframe_at_the_playhead`), `crates/ui-egui/tests/it/keyframes_ui.rs`, `lane_tests` in `crates/ui-egui/src/panels/effect_controls.rs` | `effects.addKeyframe` adds a keyframe at the playhead or removes the one there (the value falls back to the remaining keyframes; undo, redo, parameters that name nothing); headless: the Properties diamond turns animation on, adds and removes the keyframe at the playhead (Scale 50 % → 100 % again), its ◀ ▶ arrows and Effect Controls' step between keyframes, Crop is applied before its first keyframe; a click on the Effect Controls time ruler and a drag of the playhead's handle move the playhead, and no playhead is drawn off the clip; ruler labels are sequence timecode, and clip times, frame rates and panel widths at their limits don't panic (`FILMCRAFT_UI_SHOTS=<dir>` writes `keyframes-*.png`) |
 | Golden images | `crates/golden/tests/golden.rs` | CPU renders vs committed PNGs; GPU vs CPU on the same scenes (§3) |
+| Slip Monitor | `crates/engine/src/slip_tests.rs`, `crates/ui-egui/tests/it/slip_monitor_ui.rs`, `trim_preview_tests` in `crates/ui-egui/src/panels/timeline.rs` | `timeline.slipPreview` = what `timeline.slip` commits for every delta (linked pair at unequal media limits #529, speed 200 %, reversed, 30 fps media in a 25 fps sequence), neighbours static, no project change or undo step, hostile params; headless: Y + drag shows the four ids at once, In/Out follow every pointer step and the pictures show those decoded frames, release commits what was shown (one undo step, undo/redo), Escape leaves the project untouched, a fast drag keeps ≤ 8 frame jobs queued; `slip_monitor_screenshots` and `perf_slip_monitor_4k_long_gop` (ignored) render the view and time 4K H.264 / HEVC |
 | Engine / command | `crates/engine/src/tests.rs` | run commands on the demo project, assert the sequence, undo/redo, disabled cases |
 | Render | `crates/render/src/tests.rs` | compositing, opacity, Motion, cross dissolve midpoint, ½-res vs full, GPU plan vs reference, audio mix, audio-effect continuity |
 | Multi-camera / sync | `crates/audio-dsp/src/sync.rs`, `crates/engine/src/multicam_tests.rs`, `crates/ui-egui/tests/it/multicam_ui.rs` | audio offsets within one sample: Rust-generated multi-mic speech (gains −20…+10 dB, SNR 40/25/10/3 dB, zero-phase colouring, fractional delays, a 0 dB-SNR room with a −4 dB echo) and ffmpeg-made camera/recorder files (pink-noise bursts, independent noise; exact lags recovered); timecode (± hours) and marker sync within a frame; Merge Clips; timeline Synchronize keeps frame-aligned starts; multicam structure, angle render (PSNR vs the camera), Switch Audio mix = the angle's track, live switching from a simulated playback clock (cuts, healing, one undo step), Ctrl+N cuts, flatten (frames identical), save/load; 20 angles: paging (auto / 2×2 / 3×3), page-relative keys, absolute cameras beyond 16, a page decoding only its angles at the cell scale (recording source), Auto-Adjust scale, Selection Top Down; headless: page arrows, angle 17–20 cells, grid-only view, Edit Cameras thumbnails; `perf_grid_of_four_1080p_angles` (ignored) prints the grid cost |
@@ -44,13 +45,15 @@ stays a binary of its own in `tests/`. Select one file's tests with its module p
 | Oracle | `crates/*/tests/{,it/}*oracle*.rs`, `conformance.rs` | compare with ffmpeg/ffprobe (§2) |
 | Robustness / fuzz | `*/tests/{,it/}robustness.rs`, `*/tests/{,it/}fuzz.rs` | seeded mutation and truncation of real and synthetic files; nothing may panic |
 | Program monitor while dragging | `crates/ui-egui/tests/it/perf_ui.rs` | headless: a parameter changed on every UI pass (a value dragged in Effect Controls or Properties) and a backward scrub leave the Program monitor's picture at most one step behind (it shows the frame asked for the pass before while the frame due renders; it used to freeze until the mouse rested); a frame still rendering is kept when the same frame is asked for at a newer revision, so frames slower than a refresh (CPU effects) are shown too; `perf.stats` reports the picture's frame and revision against the playhead and the project |
+| Trim Monitor pictures at a cut inside one take | `crates/ui-egui/tests/it/trim_monitor_frames_ui.rs`, `frames::tests` in `crates/ui-egui/src/frames.rs` | each picture asks for frames in its own frame-server view (`FrameServer::request_in_view`), so the outgoing and incoming frames of one media item at one size no longer cancel each other's decode; `the_other_pictures_running_decode_survives_a_request` pins it through the real request path with a decode held running (deterministic), and `a_decode_both_pictures_wait_for_survives_either_moving_on` keeps a frame both pictures asked for from being cancelled when one of them moves on, and `a_running_prefetch_a_picture_asks_for_survives_stopping_playback` keeps a frame playback was prefetching when a picture asks for it and playback stops; headless: both pictures arrive after the edit point is selected with no job cancelled or dropped, and follow a roll; ignored `perf_trim_monitor_4k_through_edit` prints settle times and started / given-up jobs for 4K H.264/HEVC (needs ffmpeg) |
 | Performance | `*/tests/{,it/}perf.rs` (`#[ignore]`) | §5 |
 
-Commit `*.proptest-regressions` files so failing cases are re-run.
+Turn a failing generated case into a named test instead of committing a `*.proptest-regressions` file ([testing.md](https://github.com/storytold/craft-contrib/blob/main/standards/testing.md)).
 
 ### 32-bit parser regressions
 
-The `hostile_lengths` unit tests in `bitstream`, `vp9` and `av1` cover #2801: NAL and superframe
+The `hostile_lengths` unit tests in `bitstream` (here) and in the VP9 and AV1 decoders (craft-libs'
+`craft-video`, where those decoders now live) cover #2801: NAL and superframe
 offset overflow, tile-size increment overflow and truncating an OBU's LEB128 size to `usize`.
 They also check valid payloads, truncated inputs and bit mutations. The NAL splitter rejects
 prefix widths outside 1–4 bytes with `BitError::InvalidNalLengthSize`, including zero (which
@@ -76,8 +79,11 @@ const fs = require('node:fs');
 })().catch(error => { console.error(error); process.exitCode = 1; });
 EOF
 export CARGO_TARGET_WASM32_WASIP1_RUNNER="node /tmp/filmcraft-wasi-runner.cjs"
-cargo test -p filmcraft-bitstream -p filmcraft-vp9 -p filmcraft-av1 --lib \
+cargo test -p reacut-bitstream --lib \
   --no-default-features --target wasm32-wasip1 hostile_lengths -- --test-threads=1
+# The VP9 and AV1 cases, in a craft-libs checkout (same runner):
+cargo test -p craft-video --lib --features vp9-decode,av1-decode \
+  --target wasm32-wasip1 hostile_lengths -- --test-threads=1
 # Repeat with --release: wrapping arithmetic is also dangerous without overflow checks.
 ```
 
@@ -89,7 +95,7 @@ test process, so a trapped regression cannot count as a pass.
 ## 2. ffmpeg oracle tests
 
 ffmpeg and ffprobe are **external processes** used to generate fixtures and to check results. They
-are never linked or shipped ([AGENTS.md](../AGENTS.md) §2).
+are never linked or shipped ([clean-room.md](https://github.com/storytold/craft-contrib/blob/main/standards/clean-room.md)).
 
 - The tools are found by `filmcraft-testkit` (a dev-dependency-only crate, `crates/testkit`), in
   this order: `FILMCRAFT_FFMPEG` / `FILMCRAFT_FFPROBE` (explicit paths; a wrong path is an error),
@@ -98,7 +104,7 @@ are never linked or shipped ([AGENTS.md](../AGENTS.md) §2).
 - If a tool is missing the test prints `SKIPPED (<test>): ffmpeg not found …` and passes. Set
   **`FILMCRAFT_REQUIRE_ORACLES=1`** (CI) to make every such skip a failure. In new tests use
   `let ff = filmcraft_testkit::require_ffmpeg!();` (also `require_ffprobe!`, `require_oracles!`).
-- Some oracles need a recent ffmpeg: the APV tests (`crates/apv/tests/it/oracle.rs`) skip when
+- Some oracles need a recent ffmpeg: the APV tests (craft-libs `crates/video/tests/apv`) skip when
   `ffmpeg -formats` does not list `apv` (ffmpeg ≥ 8.0), naming the detected version.
 - Fixtures are generated on first use into `<workspace>/target/fixtures/<crate>/`
   (`filmcraft_testkit::fixtures_dir`; independent of `CARGO_TARGET_DIR`, so agents with private
@@ -113,8 +119,8 @@ are never linked or shipped ([AGENTS.md](../AGENTS.md) §2).
   parallel test run or on a fresh machine). It runs each crate's ignored `generate_fixtures` test —
   the same generators the oracle tests call — for `h264`, `hevc`, `isobmff`, `matroska`, `dnx`,
   `prores`, `mpeg2v`, `ac3` and `codecs` (MXF, Ogg and MPEG TS / PS), and prints one `made` / `cached` / `skipped` line per fixture plus a summary. The
-  `aac`, `opus` and `h264enc` oracles generate small per-test signals on demand and are not part of
-  the matrix.
+  `aac` and `opus` oracles here generate small per-test signals on demand, and craft-libs H.264
+  encoder tests generate their own signals; none are part of the fixture matrix.
 - Fixture sources are synthetic: `testsrc2`, `mandelbrot`, SMPTE bars, noise and fades, sine tones.
   H.264 and HEVC fixtures need ffmpeg built with libx264 and libx265. VideoToolbox fixtures are
   generated only on macOS. The Media Foundation parity tests (`crates/platform/tests/it/media_foundation.rs`,
@@ -144,7 +150,7 @@ anything is "fixed" to match) and add asserts for anything new.
 |---|---|---|
 | `h264` | decode every fixture single-threaded and frame-threaded; compare with `ffmpeg -f rawvideo -pix_fmt yuv420p` | **bit-exact**, every frame |
 | `hevc` | same, `yuv420p` / `yuv420p10le` | **bit-exact** (8- and 10-bit) |
-| `h264enc` | `ffmpeg -v warning -err_detect +crccheck+bitstream+buffer+explode` decodes our stream | no output at all (a `corrupt decoded frame` warning fails; a negative control checks dropped and truncated slices are reported), exact frame count, **bit-identical to the encoder's reconstruction**; B-frame order checked with ffprobe; rate-control targets |
+| craft-video H.264 encoder (`h264-encode`) | `ffmpeg -v warning -err_detect +crccheck+bitstream+buffer+explode` decodes the shared encoder stream | no output at all (a `corrupt decoded frame` warning fails; a negative control checks dropped and truncated slices are reported), exact frame count, **bit-identical to the encoder's reconstruction**; B-frame order checked with ffprobe; rate-control targets |
 | `prores` decode | ffmpeg `prores_ks` / `prores_aw` fixtures, compared at native depth | within **±1 LSB** (different integer IDCT); alpha bit-exact |
 | `prores` encode | ffmpeg decodes with `-xerror` | no errors; agrees with our decoder within ±1 |
 | `dnx` decode | ffmpeg VC-3 fixtures (13 DNxHD CIDs, DNxHR LB/SQ/HQ/HQX/444), compared at native depth | within **±2 LSB**, ≤ 100 samples per million beyond ±1 (ffmpeg's integer IDCT; we evaluate the exact IDCT) |
@@ -175,6 +181,10 @@ Each codec README has the full fixture matrix and the measured results.
 - `crates/gpu/src/tests.rs` composites the same frame plan (a YUV layer plus a transformed,
   semi-transparent RGBA layer) on the GPU and on the CPU. It requires a 99th-percentile channel
   difference of ≤ 6 and a mean of < 1.5 (8-bit levels). It skips when no GPU adapter is available.
+  A software adapter counts: wgpu offers one when there is no GPU, so on a machine without a GPU
+  installing Mesa's lavapipe (`mesa-vulkan-drivers` on Debian / Ubuntu) runs these tests. CI does
+  that and sets `FILMCRAFT_REQUIRE_GPU=1`, so missing adapters/devices fail the normal
+  suite instead of silently skipping; the tests print the selected adapter.
 - Effects implemented only on the CPU need no GPU test: the plan pre-renders those layers on the
   CPU.
 - **Golden images** (`crates/golden`, a test-only crate): `tests/golden.rs` builds small procedural
@@ -201,12 +211,12 @@ Each codec README has the full fixture matrix and the measured results.
   from both, the output is finite and deterministic (also on 1×1 / odd sizes and NaN progress), every
   parameter visibly changes the picture, and every direction differs. Golden *fingerprints* (4×4 mean
   RGB grid at p = 0.25/0.5/0.75, ±4 levels) live in `src/transitions/goldens.txt`; re-bless with
-  `FILMCRAFT_BLESS=1 cargo test -p filmcraft-render golden_fingerprints` and review the diff.
-  `FILMCRAFT_TRANSITION_SHEETS=<dir> cargo test -p filmcraft-render contact_sheets -- --ignored`
+  `FILMCRAFT_BLESS=1 cargo test -p reacut-render golden_fingerprints` and review the diff.
+  `FILMCRAFT_TRANSITION_SHEETS=<dir> cargo test -p reacut-render contact_sheets -- --ignored`
   writes one contact-sheet PNG per folder for eyeballing (never commit them).
-- **Blessing:** `FILMCRAFT_BLESS=1 cargo test -p filmcraft-golden` rewrites the references (and
+- **Blessing:** `FILMCRAFT_BLESS=1 cargo test -p reacut-golden` rewrites the references (and
   writes a `.attribution` sidecar for any new one; it prints the `ATTRIBUTION.md` row to add).
-  References are original work rendered by FilmCraft, must stay under 50 KB (enforced on bless),
+  References are original work rendered by Reacut, must stay under 50 KB (enforced on bless),
   and every one needs its sidecar and index row (`cargo xtask assets`). Look at a re-blessed PNG
   before committing it.
 - The same scenes run through `plan_frame` + `GpuCompositor` when a GPU adapter exists
@@ -281,7 +291,7 @@ Not covered headless: `ui.screenshot` (needs a real viewport), the wgpu monitor 
 runs the CPU texture path), audio output, and wall-clock playback advance (kittest frames do not
 advance real time). Playing sound is covered without a device: `play_ahead` tests drive the
 mixed-ahead ring with a wall-clock device (order, underruns stay in time, mixer panic, stop), and
-`cargo run --release -p filmcraft-ui-egui --example bench_audio -- <project.fcproj>` plays a real
+`cargo run --release -p reacut-ui-egui --example bench_audio -- <project.fcproj>` plays a real
 project's sequences through a simulated 48 kHz device and counts dropouts, mixing in the callback
 (`direct`, as before) against mixing ahead (`ahead`). Use `Driver` for new UI regressions: `d.exec(command, params)`,
 `d.ok(method, params)`, `d.frames(n)`.
@@ -291,26 +301,26 @@ project's sequences through a simulated 48 kHz device and counts dropouts, mixin
 For visual work, drive the real app:
 
 ```sh
-cargo run --release -p filmcraft -- --control 9876
+cargo run --release -p reacut -- --control 9876
 ```
 
 Then script it over the control channel or MCP: run commands, click by automation id,
 `ui.inspect` / `ui.elements` to assert state, and `ui.screenshot {"path": "…"}` to capture the window
 or a single panel (`{"panel": "Timeline"}`). Look at every screenshot. Examples are in
-[agents.md](agents.md). The headless path (`filmcraft-cli run script.jsonl`, MCP `--demo`) covers
+[agents.md](agents.md). The headless path (`reacut-cli run script.jsonl`, MCP `--demo`) covers
 engine behaviour without a window.
 
 ## 5. Performance
 
 | Benchmark | Command |
 |---|---|
-| H.264 decode, 1080p, threads sweep | `cargo test --release -p filmcraft-h264 --test it perf:: -- --ignored --nocapture` |
-| HEVC decode, 1080p / 2160p | `cargo test --release -p filmcraft-hevc --test it perf:: -- --ignored --nocapture` |
-| ProRes decode/encode | `cargo test --release -p filmcraft-prores --test it perf:: -- --ignored --nocapture` |
-| Encoder speed / PSNR / bitrate | `cargo run --release -p filmcraft-h264enc --example h264enc_synth -- …` |
-| Export to H.264 + AAC on the CPU (1080p clip through `file.exportMedia`, wall time per run, `--keep out.mp4` to compare files) | `cargo run --release -p filmcraft-engine --example bench_export -- --runs 7` |
-| Decode a real file through the media stack | `cargo run --release -p filmcraft-cli -- bench-decode file.mp4 --frames 120` |
-| Coding-tool coverage of the fixtures | `cargo test --release -p filmcraft-h264 --test it conformance::coverage_report -- --ignored --nocapture` (same for `hevc`) |
+| H.264 decode, 1080p, threads sweep | in craft-libs: `cargo test --release -p craft-video --features h264-decode,threads --test h264_decode perf:: -- --ignored --nocapture` |
+| HEVC decode, 1080p / 2160p | in craft-libs: `cargo test --release -p craft-video --features hevc-decode,threads --test hevc_decode perf:: -- --ignored --nocapture` |
+| ProRes decode/encode | in craft-libs: `cargo test --release -p craft-video --features prores,threads --test prores perf:: -- --ignored --nocapture` |
+| Encoder speed / PSNR / bitrate | in craft-libs: `cargo run --release -p craft-video --features h264-encode --example h264_h264enc_bench -- …` |
+| Export to H.264 + AAC on the CPU (1080p clip through `file.exportMedia`, wall time per run, `--keep out.mp4` to compare files) | `cargo run --release -p reacut-engine --example bench_export -- --runs 7` |
+| Decode a real file through the media stack | `cargo run --release -p reacut-cli -- bench-decode file.mp4 --frames 120` |
+| Coding-tool coverage of the fixtures | in craft-libs: `cargo test --release -p craft-video --features h264-decode --test h264_decode conformance::coverage_report -- --ignored --nocapture` (same for `hevc`) |
 | **Whole-app suite**: decode fps per codec, playback, scrubbing, timeline UI, export, project save/open, peak RSS | `cargo xtask bench` ([performance.md](performance.md)) |
 
 `cargo xtask bench` (the example `crates/ui-egui/examples/bench/`) runs six sections, each in its
@@ -401,5 +411,14 @@ core) must run at least 4x realtime in release builds (1x in debug). On Unix it 
 thread's CPU time, so it runs with the rest of the suite. Hosts without a per-thread CPU clock
 (Windows) fall back to wall time, which depends on load, so there it is ignored by default; run it
 explicitly with
-`cargo test --release -p filmcraft-render --lib perf_24_tracks_3_effects_realtime_factor -- --ignored --nocapture`
+`cargo test --release -p reacut-render --lib perf_24_tracks_3_effects_realtime_factor -- --ignored --nocapture`
 and record the machine with the result.
+
+### Required software-GPU CI, 2026-10-30
+
+The application workflow only calls the shared gate and supplies packages and
+`FILMCRAFT_REQUIRE_GPU=1`. GPU unit and golden tests fail if adapter lookup, device
+creation, or a required float render target is unavailable. No extra application-local
+workflow job or duplicate release-build test pass is added. Local runs without this
+variable retain explicit skip behavior. An adapter log line alone is not proof that
+device creation succeeded.

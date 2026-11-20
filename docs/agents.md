@@ -1,28 +1,28 @@
 # Agents
 
-FilmCraft is built to be driven by AI agents, and largely built by them. Part 1 covers using
-FilmCraft from an agent. Part 2 covers developing FilmCraft as an agent.
+Reacut is built to be driven by AI agents, and largely built by them. Part 1 covers using
+Reacut from an agent. Part 2 covers developing Reacut as an agent.
 
-# Part 1: driving FilmCraft
+# Part 1: driving Reacut
 
 ## 1. MCP server
 
-`filmcraft-cli mcp` serves MCP on stdio. It has two modes:
+`reacut-cli mcp` serves MCP on stdio. It has two modes:
 
 | Mode | Command | What it drives |
 |---|---|---|
-| Headless | `filmcraft-cli mcp --demo` or `--project p.fcproj` (neither = empty project) | an in-process engine session, no window |
-| Bridge | `filmcraft-cli mcp --bridge 127.0.0.1:9876` | the running desktop app started with `filmcraft --control 9876` |
+| Headless | `reacut-cli mcp --demo` or `--project p.fcproj` (neither = empty project) | an in-process engine session, no window |
+| Bridge | `reacut-cli mcp --bridge 127.0.0.1:9876` | the running desktop app started with `filmcraft --control 9876` |
 
 Headless mode also takes `--data-dir DIR` (user presets). Any other option is rejected (exit 2):
 there are no folder-confinement flags such as `--automation-read-root`, so the server can read
 and write wherever the user can.
 
 **Claude Code.** The repository's `.mcp.json` registers both servers (`filmcraft` = bridge,
-`filmcraft-headless` = demo). Both point at `target/release/filmcraft-cli`, so build it first:
+`filmcraft-headless` = demo). Both point at `target/release/reacut-cli`, so build it first:
 
 ```sh
-cargo build --release -p filmcraft-cli -p filmcraft
+cargo build --release -p reacut-cli -p reacut
 export FILMCRAFT_CONTROL_TOKEN="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
 ./target/release/filmcraft --control 9876 &      # only for the bridge server
 claude                                           # approve the project MCP servers when asked
@@ -31,11 +31,11 @@ claude                                           # approve the project MCP serve
 To register the server by hand, or for another MCP client, use the absolute binary path:
 
 ```sh
-claude mcp add filmcraft-headless -- /abs/path/filmcraft/target/release/filmcraft-cli mcp --demo
+claude mcp add filmcraft-headless -- /abs/path/filmcraft/target/release/reacut-cli mcp --demo
 ```
 
 ```json
-{ "mcpServers": { "filmcraft": { "command": "/abs/path/filmcraft-cli", "args": ["mcp", "--bridge", "127.0.0.1:9876"] } } }
+{ "mcpServers": { "filmcraft": { "command": "/abs/path/reacut-cli", "args": ["mcp", "--bridge", "127.0.0.1:9876"] } } }
 ```
 
 ### Effect parameter replies
@@ -56,19 +56,19 @@ returns `{"removed": true}` or `{"removed": false}` (no keyframe sat exactly at 
 
 ### From an installed release
 
-The release packages ship `filmcraft-cli` alongside the desktop app, so no build is needed:
+The release packages ship `reacut-cli` alongside the desktop app, so no build is needed:
 
 | Install | CLI |
 |---|---|
-| Windows (MSI) | `%LOCALAPPDATA%\Programs\ArtCraft\FilmCraft\filmcraft-cli.exe` by default (`C:\Program Files\ArtCraft\FilmCraft\filmcraft-cli.exe` for an all-users install, under `Program Files (x86)` instead for the 32-bit build, or wherever you installed it otherwise), not on `PATH` |
-| Linux (deb, rpm) | `/usr/bin/filmcraft-cli` |
-| macOS | the separate `filmcraft-cli-<version>-macos-<arch>.zip` release asset (the `.app` holds only the desktop app) |
+| Windows (MSI) | `%LOCALAPPDATA%\Programs\ArtCraft\Reacut\reacut-cli.exe` by default (`C:\Program Files\ArtCraft\Reacut\reacut-cli.exe` for an all-users install, under `Program Files (x86)` instead for the 32-bit build, or wherever you installed it otherwise), not on `PATH` |
+| Linux (deb, rpm) | `/usr/bin/reacut-cli` |
+| macOS | the separate `reacut-cli-<version>-macos-<arch>.zip` release asset (the `.app` holds only the desktop app) |
 
 ```sh
 # Windows (PowerShell), default install folder
-claude mcp add filmcraft -- "$env:LOCALAPPDATA\Programs\ArtCraft\FilmCraft\filmcraft-cli.exe" mcp
+claude mcp add filmcraft -- "$env:LOCALAPPDATA\Programs\ArtCraft\Reacut\reacut-cli.exe" mcp
 # Linux, or macOS with the CLI unzipped onto PATH
-claude mcp add filmcraft -- filmcraft-cli mcp
+claude mcp add filmcraft -- reacut-cli mcp
 ```
 
 ### Tools
@@ -99,11 +99,11 @@ Typical loop: `project_inspect` / `sequence_inspect` → get ids → `command_ru
 ### Conventions
 
 The server follows a few conventions that make it predictable for agents. They are not
-FilmCraft-specific: the sibling craft apps' MCP servers can follow the same ones, so an agent that has
+Reacut-specific: the sibling craft apps' MCP servers can follow the same ones, so an agent that has
 driven one app can drive the others.
 
 - **Core tools.** `command_list`, `command_run`, `command_batch`, `doc_inspect` and `render_preview`
-  work in both modes. The FilmCraft tools above stay as they are.
+  work in both modes. The Reacut tools above stay as they are.
 - **Titles and annotations.** Every tool has a `title` and the four MCP hints (`readOnlyHint`,
   `destructiveHint`, `idempotentHint`, `openWorldHint`), so a client can let the read-only tools
   (lists, inspects, renders, screenshots) run without asking and ask before edits. When you add a
@@ -150,18 +150,26 @@ progress and stop it:
   name the first still as `path`, the name `file.import` takes for the sequence, and the two commands
   add `lastPath`, the last still, and `basePath`, the name the stills are numbered from (a cancelled
   long export's clean-up removes only the stills numbered from `basePath` with the digits of
-  `lastPath`, up to it). `filmcraft-cli export` prints the first and the last.
+  `lastPath`, up to it). `reacut-cli export` prints the first and the last.
 - `file.exportMedia`, `export.quick`, `export.resolve` and `export.queue.add` also return `warnings` (an array of
   strings, empty when none). If the default or explicitly selected In/Out range covers one
   sequence frame and at least one mark is set, the warning suggests `range: "entire"` (#3364).
   The export still succeeds, including with `wait: true` over MCP or the bridge. Explicit custom,
   work-area and entire-sequence ranges are unchanged and do not warn. Queue additions collect
-  warnings from the newly added ranges. `filmcraft-cli export` (including `--queue`)
+  warnings from the newly added ranges. `reacut-cli export` (including `--queue`)
   also prints the warning on stderr and suggests `--range entire`; the warning does not change
   the exit status. Frame counts here use the sequence rate, even when the export rate differs.
+- A finished export's `result` (`file.exportMedia` with `wait: true`, its job in `jobs.list`, each
+  finished item of `export.queue.list` and `export.queue.add`) names the video encoder that ran in `encoder`: `"NVENC"` or `"VideoToolbox"`, or `"software"` for
+  Reacut's own (absent for audio, image sequences and GIF). `hardwareEncoding: "auto"` asks for
+  a hardware encoder but does not promise one: when it declines the export (two-pass VBR, HDR, MXF,
+  no driver…) the software encoder runs, and `result.warnings` says so with the reason when there is
+  one, e.g. `hardware encoding declined (NVENC: two-pass VBR); the software H.264 encoder ran`. The
+  app logs the same line as a warning and shows it in Events after the job's "Finished" line, and
+  `reacut-cli export` (with or without `--queue`) prints it on stderr.
 - Bridge mode works the same way: the export runs as an app job (the app stays responsive and shows
   "Exporting… NN%" in its status bar) and the call returns when it is written, however long it
-  takes. `filmcraft-cli --bridge … exec file.exportMedia … wait=true` blocks the same way.
+  takes. `reacut-cli --bridge … exec file.exportMedia … wait=true` blocks the same way.
 
 ## 2. Control channel
 
@@ -222,32 +230,32 @@ Notes:
 - `timeline.move` takes linked partners along while Linked Selection is on: moving a picture
   clip moves its sound by the same offset (pass `"linked": false` to move only the listed clips).
   It returns `{"moved": [ids]}`, every clip that moved.
-- Without a window, `filmcraft-cli run script.jsonl` (lines of `{"id":"…","params":{…}}`) runs the
+- Without a window, `reacut-cli run script.jsonl` (lines of `{"id":"…","params":{…}}`) runs the
   same commands headlessly. See §2b for the rest of the CLI.
 
 ## 2b. Command-line interface
 
 Every command is also one shell call away. Options go anywhere; output is JSON; exit status is 0 on
-success, 1 when a command fails and 2 on a usage error. `filmcraft-cli help`, `filmcraft-cli --help`
-and `filmcraft-cli -h` print the reference and exit successfully.
-If the reader of stdout closes the pipe early (`filmcraft-cli commands | head`), the CLI drops the rest
+success, 1 when a command fails and 2 on a usage error. `reacut-cli help`, `reacut-cli --help`
+and `reacut-cli -h` print the reference and exit successfully.
+If the reader of stdout closes the pipe early (`reacut-cli commands | head`), the CLI drops the rest
 of its output but still finishes the work, saves included, and the exit status still reports
 failures; any other stdout write error is reported and makes the status 1.
 
 ```sh
-filmcraft-cli commands razor                     # find ids (add --json for machine output)
-filmcraft-cli describe timeline.razor            # one command: menu, shortcut, params, enabled now
-filmcraft-cli --demo inspect sequence            # project / sequence as JSON
-filmcraft-cli --project p.fcproj --save exec timeline.razor seconds=3.5
-filmcraft-cli --project p.fcproj exec effects.apply '{"effect":"Gaussian Blur"}'
-filmcraft-cli --project p.fcproj exec markers.exportCsv path=review.csv
-filmcraft-cli --project p.fcproj --save import a.mov b.wav
-filmcraft-cli --project p.fcproj export out.mp4  # format from the extension; waits for the job
-filmcraft-cli --project p.fcproj export out --preset "YouTube 1080p Full HD" --start 0 --end 10
-filmcraft-cli export --list-presets prores       # built-in + user presets (--data-dir for another library)
-filmcraft-cli --project p.fcproj exec export.queue.add preset="Apple ProRes 422 HQ" path=renders/ start=true wait=true
-echo '{"id":"file.newBin","params":{"name":"Selects"}}' | filmcraft-cli --project p.fcproj --save run -
-filmcraft-cli --bridge 127.0.0.1:9876 exec window.workspace.color   # the running app
+reacut-cli commands razor                     # find ids (add --json for machine output)
+reacut-cli describe timeline.razor            # one command: menu, shortcut, params, enabled now
+reacut-cli --demo inspect sequence            # project / sequence as JSON
+reacut-cli --project p.fcproj --save exec timeline.razor seconds=3.5
+reacut-cli --project p.fcproj exec effects.apply '{"effect":"Gaussian Blur"}'
+reacut-cli --project p.fcproj exec markers.exportCsv path=review.csv
+reacut-cli --project p.fcproj --save import a.mov b.wav
+reacut-cli --project p.fcproj export out.mp4  # format from the extension; waits for the job
+reacut-cli --project p.fcproj export out --preset "YouTube 1080p Full HD" --start 0 --end 10
+reacut-cli export --list-presets prores       # built-in + user presets (--data-dir for another library)
+reacut-cli --project p.fcproj exec export.queue.add preset="Apple ProRes 422 HQ" path=renders/ start=true wait=true
+echo '{"id":"file.newBin","params":{"name":"Selects"}}' | reacut-cli --project p.fcproj --save run -
+reacut-cli --bridge 127.0.0.1:9876 exec window.workspace.color   # the running app
 ```
 
 `key=value` values are parsed as JSON when they can be (`3.5`, `true`, `[1,2]`), otherwise taken as
@@ -292,21 +300,21 @@ failed write reports an error. The menu opens the normal save dialog; cancelling
 
 For any UI change, look at the result:
 
-1. `cargo run --release -p filmcraft -- --control 9876`
+1. `cargo run --release -p reacut -- --control 9876`
 2. Drive the feature through the control channel or the MCP bridge: commands, then clicks and drags
    by automation id.
 3. Assert on `ui.inspect`, `ui.elements` and `sequence.inspect`.
 4. Take `ui.screenshot` (the whole window and the panel you changed) and open the PNG.
 
-Screenshots you commit must follow [AGENTS.md](../AGENTS.md) §1: FilmCraft only, openly licensed
+Screenshots you commit must follow [standards/clean-room.md](https://github.com/storytold/craft-contrib/blob/main/standards/clean-room.md): Reacut only, openly licensed
 media, sidecar and `ATTRIBUTION.md` entry.
 
-# Part 2: developing FilmCraft
+# Part 2: developing Reacut
 
 ## 4. Orientation, in this order
 
-1. [AGENTS.md](../AGENTS.md): absolute rules (assets, clean-room, licences).
-2. [CLAUDE.md](../CLAUDE.md): working instructions and non-negotiables.
+1. [AGENTS.md](../AGENTS.md): the shared rules and the facts about this repository.
+2. [contributing.md](contributing.md): setup, checks and commits.
 3. [ROADMAP.md](../ROADMAP.md) for the summary, then [gaps.md](gaps.md) (the ranked shortfalls) first,
    [target-app-parity.md](target-app-parity.md) and [roadmap.md](roadmap.md) (milestones, current focus).
 4. [architecture.md](architecture.md), then the README and tests of the crate you'll touch.
@@ -324,7 +332,7 @@ everything you need to contribute is in the public docs above. Ask a maintainer 
    architecture section and crate README.
 2. **Plan tests first.** Write down the acceptance test before writing code.
 3. **Implement and test.**
-4. **Verify.** Run all gates (`cargo xtask ci`). For UI work, run the app with `--control`, drive it
+4. **Verify.** Run the checks for the crates you changed (contributing.md §3). For UI work, run the app with `--control`, drive it
    and look at the screenshots (§3).
 5. **Record.** Update the crate README (behaviour decisions, test results, limitations) and
    the progress docs when a milestone moves (ROADMAP.md, docs/roadmap.md, the relevant parity doc
@@ -339,7 +347,7 @@ Don't block on choices you can make yourself:
 
 - **Behaviour.** Match the publicly documented and observable behaviour of professional editors
   (help pages, published shortcut lists, using the app). Never inspect application internals
-  ([AGENTS.md](../AGENTS.md) §2). If behaviour is undocumented, choose what editors most commonly
+  ([standards/clean-room.md](https://github.com/storytold/craft-contrib/blob/main/standards/clean-room.md)). If behaviour is undocumented, choose what editors most commonly
   expect and record the choice in the crate README.
 - **Ask a human only about:**
   - licences outside the allowlist;
@@ -354,11 +362,11 @@ Don't block on choices you can make yourself:
 A feature is done when:
 
 - [ ] its command(s) are registered with label, menu path, shortcut (if any) and a parameter doc;
-- [ ] engine tests cover it, including undo/redo and the disabled case;
+- [ ] tests cover its behaviour per [testing.md](https://github.com/storytold/craft-contrib/blob/main/standards/testing.md), including undo/redo and the disabled case where they apply;
 - [ ] the UI is wired: menu, panel control and shortcut;
 - [ ] every new interactive widget has an automation id;
 - [ ] you have driven it through the control channel and reviewed a screenshot;
-- [ ] all gates pass (`cargo xtask ci`), and new assets have sidecars;
+- [ ] the checks for the crates you changed pass, and new assets have sidecars;
 - [ ] the crate README and the progress docs (ROADMAP.md, docs/gaps.md, the parity docs) are updated where relevant;
 - [ ] it is committed with its task id.
 
@@ -418,7 +426,7 @@ report URL loss. Imported addresses are checked again before opening.
 `colors.addCustom {color:"#RRGGBB"}` saves a reusable project-local marker/clip swatch (maximum 64). Duplicate colors are no-ops. Palette additions are independently undoable from marker edits.
 Interchange imports fill missing names on existing swatches while preserving target names,
 even when the palette is full. Formats that cannot retain the saved palette warn about its
-loss even if none of its colors are assigned; FilmCraft projects and OTIO retain it.
+loss even if none of its colors are assigned; Reacut projects and OTIO retain it.
 An OTIO collection unions its timelines' saved palettes in encounter order, preserving the
 first valid name and filling missing names for retained colors. Empty later palettes do
 not clear earlier colors. Colors beyond the project's 64-entry limit produce a warning.
@@ -437,15 +445,15 @@ identity for editing; `timeline.markerEnd.<id>`, `source.markerEnd.<id>`, and
 `program.markerEnd.<id>` expose the end flags to automation. Point markers keep their whole flag.
 
 On macOS, custom marker/clip colors and project-palette edits open the system Color panel.
-Its live selection updates only the draft; FilmCraft's Add/Save/Apply and Cancel actions keep
+Its live selection updates only the draft; Reacut's Add/Save/Apply and Cancel actions keep
 ownership of project changes and Undo. Closing the Color panel retains the draft without applying
 it. Colors are converted to opaque sRGB `#RRGGBB`; typed hex values update the open panel.
-Preset swatches and named project colors remain in FilmCraft. Other hosts, headless automation,
-and native-picker failures reuse egui's established opaque color picker with FilmCraft's hex field.
+Preset swatches and named project colors remain in Reacut. Other hosts, headless automation,
+and native-picker failures reuse egui's established opaque color picker with Reacut's hex field.
 The `*.native` automation control reopens the system panel; `*.hex` remains available on either path. Switching projects or leaving
 the draft closes its native panel, and an older draft cannot redirect or close a newer picker.
 While the native Color panel has keyboard focus, its Edit menu uses AppKit's normal text actions
-for Copy/Paste, Select All, and Undo/Redo. FilmCraft's Edit menu returns when its main window
+for Copy/Paste, Select All, and Undo/Redo. Reacut's Edit menu returns when its main window
 regains focus. Temporary panel hiding during app deactivation does not discard the color draft.
 
 This host picker is scoped to marker colors, clip labels, and project palette editing. Existing

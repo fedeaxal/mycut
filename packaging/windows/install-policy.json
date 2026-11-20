@@ -1,9 +1,9 @@
 {
-  "id": "filmcraft",
-  "name": "FilmCraft",
+  "id": "reacut",
+  "name": "Reacut",
   "upgradeCode": "31E6FB14-9DBC-41DD-B24B-26B71FB31B62",
   "sources": [
-    "filmcraft.wxs"
+    "reacut.wxs"
   ],
   "icon": "assets/app-icon/filmcraft.ico",
   "localization": [],
@@ -12,8 +12,8 @@
   ],
   "payloads": [
     "NOTICE",
-    "filmcraft-cli.exe",
-    "filmcraft.exe",
+    "reacut-cli.exe",
+    "reacut.exe",
     "sherpa-onnx-c-api.dll",
     "onnxruntime.dll",
     "onnxruntime_providers_shared.dll",
@@ -22,7 +22,7 @@
   "registry": [
     [
       "-1",
-      "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\filmcraft.exe",
+      "Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\reacut.exe",
       "",
       "[#FilmcraftExe]"
     ]

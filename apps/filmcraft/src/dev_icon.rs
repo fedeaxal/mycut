@@ -3,7 +3,7 @@
 //! The Linux shell (Wayland *and* X11) resolves the window to a `.desktop` file by app id (set in
 //! `main.rs` via `eframe`'s `with_app_id`) and takes the taskbar / window-list icon from its
 //! `Icon=` entry in the hicolor theme. Packaging installs both
-//! (`packaging/linux/ai.storyteller.filmcraft.desktop` and the hicolor PNGs) — but a source-tree
+//! (`packaging/linux/io.github.fedeaxal.reacut.desktop` and the hicolor PNGs) — but a source-tree
 //! run has neither, so KDE/GNOME fall back to the generic Wayland icon. The fix is to ensure a
 //! user-level entry for those runs: when no entry for the app id exists in any XDG data dir,
 //! install one (plus the hicolor icon PNGs, read from this checkout's `assets/app-icon`, so
@@ -20,7 +20,7 @@
 //! `Exec=` the same two-layer way as here; keep the two in sync.
 //!
 //! Every failure is logged and skipped — a missing dev icon must never stop the app
-//! ([`AGENTS.md`](/AGENTS.md) §0 "never crash").
+//! ([`AGENTS.md`](/AGENTS.md) rule 13, "never crash").
 
 /// Install the user-level desktop entry and icons for a source-tree run (Linux).
 pub fn ensure_dev_desktop_entry() {
@@ -90,7 +90,7 @@ fn ensure() -> Result<(), DevIconError> {
     }
     let applications = user_dir.join("applications");
     std::fs::create_dir_all(&applications).map_err(DevIconError::Io)?;
-    let body = desktop_file_content(crate::APP_ID, "FilmCraft", exe);
+    let body = desktop_file_content(crate::APP_ID, "Reacut", exe);
     std::fs::write(applications.join(&file_name), body).map_err(DevIconError::Io)?;
     Ok(())
 }
@@ -138,8 +138,8 @@ fn search_dirs(user: &std::path::Path) -> Vec<std::path::PathBuf> {
 }
 
 /// Whether the `.desktop` body's `Exec` points at our binary exactly (a stale dev entry from
-/// another checkout — `/a/filmcraft-old` is not `/a/filmcraft` — does not, and is rewritten; a
-/// packaged `Exec=filmcraft` never matches a source-tree path).
+/// another checkout — `/a/reacut-old` is not `/a/reacut` — does not, and is rewritten; a
+/// packaged `Exec=reacut` never matches a source-tree path).
 fn desktop_file_exec_is_ours(body: &str, exe: &str) -> bool {
     exec_line(body).is_some_and(|arg| arg == exe)
 }
@@ -199,7 +199,7 @@ fn unescape_string_value(value: &str) -> String {
     out
 }
 
-/// The `.desktop` body: same fields as `packaging/linux/ai.storyteller.filmcraft.desktop`, with
+/// The `.desktop` body: same fields as `packaging/linux/io.github.fedeaxal.reacut.desktop`, with
 /// `Exec` pointing at this exact binary (a dev build isn't on `$PATH`, so `TryExec` is left out)
 /// and the icon by theme name.
 fn desktop_file_content(app_id: &str, name: &str, exe: &str) -> String {
@@ -272,15 +272,15 @@ mod tests {
 
     #[test]
     fn desktop_file_matches_the_packaged_fields() {
-        let packaged = include_str!("../../../packaging/linux/ai.storyteller.filmcraft.desktop");
+        let packaged = include_str!("../../../packaging/linux/io.github.fedeaxal.reacut.desktop");
         let expected = packaged
             .lines()
             .filter(|l| !l.starts_with("TryExec="))
-            .map(|l| if l.starts_with("Exec=") { "Exec=\"/target/debug/filmcraft\" %F" } else { l })
+            .map(|l| if l.starts_with("Exec=") { "Exec=\"/target/debug/reacut\" %F" } else { l })
             .collect::<Vec<_>>()
             .join("\n")
             + "\n";
-        let body = desktop_file_content("ai.storyteller.filmcraft", "FilmCraft", "/target/debug/filmcraft");
+        let body = desktop_file_content("ai.storyteller.filmcraft", "Reacut", "/target/debug/reacut");
         assert_eq!(body, expected);
     }
 
@@ -299,18 +299,18 @@ mod tests {
     /// A written entry reads back as the exact binary it was written for, through both layers.
     #[test]
     fn exec_round_trips_through_both_layers() {
-        for exe in ["/home/dev/Projects/filmcraft/target/debug/filmcraft", "/opt/film craft/filmcraft", "/a$b\"c`d\\e"] {
-            let body = desktop_file_content("ai.storyteller.filmcraft", "FilmCraft", exe);
+        for exe in ["/home/dev/Projects/reacut/target/debug/reacut", "/opt/film craft/reacut", "/a$b\"c`d\\e"] {
+            let body = desktop_file_content("ai.storyteller.filmcraft", "Reacut", exe);
             assert_eq!(exec_line(&body).as_deref(), Some(exe));
             assert!(desktop_file_exec_is_ours(&body, exe));
         }
     }
 
     /// Only the exact executable counts: another checkout's path, a path with our path as a
-    /// prefix, and a packaged `Exec=filmcraft` are all someone else's entry.
+    /// prefix, and a packaged `Exec=reacut` are all someone else's entry.
     #[test]
     fn desktop_file_exec_is_ours_matches_only_our_binary() {
-        let body = desktop_file_content("ai.storyteller.filmcraft", "FilmCraft", "/a/filmcraft");
+        let body = desktop_file_content("ai.storyteller.filmcraft", "Reacut", "/a/reacut");
         assert!(!desktop_file_exec_is_ours(&body, "/a/filmcraft-old"));
         assert!(!desktop_file_exec_is_ours(&body, "/b/filmcraft"));
         assert!(!desktop_file_exec_is_ours("Exec=filmcraft %F\n", "/a/filmcraft"));

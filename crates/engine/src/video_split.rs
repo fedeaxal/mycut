@@ -251,6 +251,9 @@ pub fn spawn_split(s: &mut crate::Session, source: String, parts: Vec<SplitPart>
                 seconds: 0.0,
                 bytes: prog.done.load(std::sync::atomic::Ordering::Relaxed),
                 render_fps: 0.0,
+                // Stream copy runs no encoder and has nothing to warn about.
+                encoder: None,
+                warnings: Vec::new(),
             }
         });
         *res.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(report);

@@ -75,7 +75,7 @@ fn tell(text: &str, error: bool) {
     #[cfg(all(target_os = "windows", not(debug_assertions)))]
     {
         let level = if error { rfd::MessageLevel::Error } else { rfd::MessageLevel::Info };
-        let _ = rfd::MessageDialog::new().set_level(level).set_title("FilmCraft").set_description(text).show();
+        let _ = rfd::MessageDialog::new().set_level(level).set_title("Reacut").set_description(text).show();
     }
 }
 
@@ -124,17 +124,17 @@ fn main() -> eframe::Result {
             return Ok(());
         }
         Ok(Cli::Version) => {
-            tell(&format!("filmcraft {}\n", env!("CARGO_PKG_VERSION")), false);
+            tell(&format!("reacut {}\n", env!("CARGO_PKG_VERSION")), false);
             return Ok(());
         }
         Err(e) => {
-            tell(&format!("filmcraft: {e}\n\n{}", args::USAGE), true);
+            tell(&format!("reacut: {e}\n\n{}", args::USAGE), true);
             std::process::exit(2);
         }
     };
     let data_root = launch.data_dir.clone().or_else(default_data_dir);
     let log_dir = data_root.as_ref().map(|d| d.join(logging::LOG_DIR));
-    log::info!("FilmCraft {} ({} {})", env!("CARGO_PKG_VERSION"), std::env::consts::OS, std::env::consts::ARCH);
+    log::info!("Reacut {} ({} {})", env!("CARGO_PKG_VERSION"), std::env::consts::OS, std::env::consts::ARCH);
     // The log file lives next to the crash logs; opened after the arguments, so `--help`,
     // `--version` and usage errors leave no file behind. Records logged until now go in first.
     let mut log_file = None;
@@ -186,7 +186,7 @@ fn main() -> eframe::Result {
         log::error!("{msg}");
         filmcraft_ui_egui::crash::record(&msg);
         graphics.abandon();
-        let _ = rfd::MessageDialog::new().set_title("FilmCraft").set_description(&msg).set_level(rfd::MessageLevel::Error).show();
+        let _ = rfd::MessageDialog::new().set_title("Reacut").set_description(&msg).set_level(rfd::MessageLevel::Error).show();
         std::process::exit(1);
     }
     // The GPU export renderer creates its own wgpu instance with every backend; after a start
@@ -202,7 +202,7 @@ fn main() -> eframe::Result {
         graphics::apply(&mut options, graphics.mode(), backend_override);
         let app_created = Arc::new(AtomicBool::new(false));
         let creator = app_creator(launch.clone(), graphics.clone(), Arc::clone(&app_created));
-        let run = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| eframe::run_native("FilmCraft", options, creator)));
+        let run = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| eframe::run_native("Reacut", options, creator)));
         let app_created = app_created.load(Ordering::Relaxed);
         let result = match run {
             Ok(result) => result,
@@ -265,7 +265,7 @@ fn main() -> eframe::Result {
         }
         log::error!("{msg}");
         filmcraft_ui_egui::crash::record(&msg);
-        let _ = rfd::MessageDialog::new().set_title("FilmCraft").set_description(&msg).set_level(rfd::MessageLevel::Error).show();
+        let _ = rfd::MessageDialog::new().set_title("Reacut").set_description(&msg).set_level(rfd::MessageLevel::Error).show();
     }
     started
 }
@@ -319,7 +319,7 @@ fn native_options(agent: bool) -> eframe::NativeOptions {
             // surface 配 alpha:Reaction 的两个悬浮窗(弹幕条)靠透明底。
             // 主窗口自己每帧铺不透明背景,观感不变。
             .with_transparent(true)
-            .with_title("FilmCraft")
+            .with_title("Reacut")
             .with_inner_size([1600.0, 980.0])
             .with_min_inner_size([900.0, 560.0])
             .with_drag_and_drop(true)
@@ -329,7 +329,7 @@ fn native_options(agent: bool) -> eframe::NativeOptions {
             // Started for an agent (`--control`): open without taking the user's keyboard focus.
             .with_active(!agent)
             .with_icon(app_icon())
-            // Wayland matches the window to `packaging/linux/ai.storyteller.filmcraft.desktop`.
+            // Wayland matches the window to `packaging/linux/io.github.fedeaxal.reacut.desktop`.
             .with_app_id(APP_ID),
         event_loop_builder: agent_event_loop(agent),
         wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
@@ -443,8 +443,16 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
             app.dialog = None;
         }
         app.integrated_titlebar = cfg!(target_os = "macos");
-        if let Some(rs) = cc.wgpu_render_state.clone()
-            && std::env::var_os("FILMCRAFT_CPU_COMPOSITE").is_none()
+        // The raw eframe device is kept on the app whichever way the GPU
+        // compositor decision below goes: the embedded Reaction page's engine
+        // runs on it even when this window composites on the CPU. A machine
+        // whose only adapter is a software rasterizer (WARP — an iGPU too old
+        // for D3D12, a VM) used to leave that page without an engine at all:
+        // nothing added to its canvas ever showed, 没有合成画面 whatever
+        // happened. See `set_wgpu` and `panels::reaction`.
+        app.wgpu_render_state = cc.wgpu_render_state.clone();
+        if std::env::var_os("FILMCRAFT_CPU_COMPOSITE").is_none()
+            && let Some(rs) = cc.wgpu_render_state.clone()
         {
             app.set_wgpu(rs);
         }

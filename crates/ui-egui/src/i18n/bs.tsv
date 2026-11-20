@@ -1,11 +1,11 @@
 # Bosnian (bs) catalog, Latin script, Ijekavian. Columns separated by TAB: context <TAB> source <TAB> translation
 # Empty context is a plain UI string. Escapes: \n, \t, \\; preserve placeholders and trailing …
-# Original clean-room translations from the meaning of FilmCraft's English labels, using standard
+# Original clean-room translations from the meaning of Reacut's English labels, using standard
 # Bosnian video-editing vocabulary (sekvenca, glava za reprodukciju, radno područje). No proprietary
 # localization resources were used. AI-assisted (Claude Code), not yet reviewed by a native speaker;
 # the wording is shared with storytold/craft-i18n (locales/bs/filmcraft.tsv and common.tsv).
 
-	About FilmCraft	O FilmCraftu
+	About Reacut	O Reacutu
 	Add Audio Submix Track	Dodaj audio podmiks traku
 	Add Caption at Playhead	Dodaj titl na glavu za reprodukciju
 	Add Chapter Marker…	Dodaj marker poglavlja…
@@ -127,9 +127,9 @@
 	File	Datoteka
 	File…	Datoteka…
 	Fill frame	Ispuni kadar
-	FilmCraft Help…	Pomoć za FilmCraft…
-	FilmCraft on GitHub	FilmCraft na GitHubu
-	FilmCraft on getartcraft.com	FilmCraft na getartcraft.com
+	Reacut Help…	Pomoć za Reacut…
+	Reacut on GitHub	Reacut na GitHubu
+	Reacut on getartcraft.com	Reacut na getartcraft.com
 	Find Next	Pronađi sljedeće
 	Find…	Pronađi…
 	Fit	Uklopi
@@ -299,7 +299,7 @@
 	Select Previous Graphic	Odaberi prethodnu grafiku
 	Select Previous Layer	Odaberi prethodni sloj
 	Selection Follows Playhead	Odabir prati glavu za reprodukciju
-	Selection as FilmCraft Project…	Odabir kao FilmCraft projekat…
+	Selection as Reacut Project…	Odabir kao Reacut projekat…
 	Selection…	Odabir…
 	Send Backward	Pomakni nazad
 	Send to Back	Postavi na dno
@@ -372,7 +372,7 @@
 	FCPXML…	FCPXML…
 	Final Cut Pro XML…	Final Cut Pro XML…
 	General…	Općenito…
-	Hide FilmCraft	Sakrij FilmCraft
+	Hide Reacut	Sakrij Reacut
 	Hide Others	Sakrij ostale
 	Iris	Iris
 	Magenta	Magenta
@@ -380,7 +380,7 @@
 	OMF…	OMF…
 	OpenTimelineIO…	OpenTimelineIO…
 	Proxy	Proksi
-	Quit FilmCraft	Zatvori FilmCraft
+	Quit Reacut	Zatvori Reacut
 	Save Changes to this Workspace	Sačuvaj promjene u ovom radnom prostoru
 	Save as New Workspace…	Sačuvaj kao novi radni prostor…
 	Refresh Changed Media	Osvježi promijenjene medije
@@ -458,8 +458,8 @@
 	No background jobs.	Nema pozadinskih zadataka.
 	Recover Unsaved Changes	Oporavi nesačuvane promjene
 	Untitled	Bez naslova
-	FilmCraft was closed while “{name}” had unsaved changes.	FilmCraft je zatvoren dok je „{name}” imao nesačuvane promjene.
-	FilmCraft quit unexpectedly while “{name}” had unsaved changes.	FilmCraft se neočekivano zatvorio dok je „{name}” imao nesačuvane promjene.
+	Reacut was closed while “{name}” had unsaved changes.	Reacut je zatvoren dok je „{name}” imao nesačuvane promjene.
+	Reacut quit unexpectedly while “{name}” had unsaved changes.	Reacut se neočekivano zatvorio dok je „{name}” imao nesačuvane promjene.
 	Recover unsaved changes from {when}?	Oporaviti nesačuvane promjene od {when}?
 	The project had not been saved yet.	Projekat još nije bio sačuvan.
 	{n} sessions have unsaved changes:	Sesije s nesačuvanim promjenama: {n}
@@ -984,7 +984,7 @@
 	Font family	Porodica fonta
 	Label Colors	Boje oznaka
 	Decoded frames held for the monitors and thumbnails: {used} of {budget}.	Dekodirane sličice zadržane za monitore i sličice: {used} od {budget}.
-	FilmCraft keeps the rest of the RAM free for other applications.	FilmCraft ostavlja ostatak RAM-a slobodnim za druge aplikacije.
+	Reacut keeps the rest of the RAM free for other applications.	Reacut ostavlja ostatak RAM-a slobodnim za druge aplikacije.
 	not available in this session	nije dostupno u ovoj sesiji
 	Currently: {loc} — {files} file(s), {size}	Trenutno: {loc} — datoteka: {files}, {size}
 	 ({ch} output channels)	 ({ch} izlaznih kanala)
@@ -1096,7 +1096,7 @@
 	Video Frame	Video sličica
 	Pin To	Prikvači uz
 	Pinned Edges	Prikvačene ivice
-	FilmCraft Graphics Template	Grafički predložak FilmCrafta
+	Reacut Graphics Template	Grafički predložak Reacuta
 	{n} Font	{n} font
 	{n} Size	{n} veličina
 	{n} Color	{n} boja
@@ -1106,7 +1106,7 @@
 	Export As Motion Graphics Template	Izvezi kao predložak animirane grafike
 	Category:	Kategorija:
 	Editable properties:	Svojstva koja se mogu uređivati:
-	Saved as a FilmCraft graphics template (.fcgt) in your templates folder.	Sačuvano kao grafički predložak FilmCrafta (.fcgt) u vašem folderu predložaka.
+	Saved as a Reacut graphics template (.fcgt) in your templates folder.	Sačuvano kao grafički predložak Reacuta (.fcgt) u vašem folderu predložaka.
 	Exported graphics template to {path}	Grafički predložak izvezen u {path}
 	Replace Fonts in Projects	Zamijeni fontove u projektima
 	Fonts used in the project:	Fontovi korišteni u projektu:
@@ -1475,7 +1475,7 @@
 	Center of Sphere	Središte sfere
 	Cents	Centi
 	Change to Color	Promijeni u boju
-	Changes are copied in the background a moment after each edit. If FilmCraft quits unexpectedly, they are offered the next time it starts.	Promjene se kopiraju u pozadini trenutak nakon svake izmjene. Ako se FilmCraft neočekivano zatvori, nude se pri sljedećem pokretanju.
+	Changes are copied in the background a moment after each edit. If Reacut quits unexpectedly, they are offered the next time it starts.	Promjene se kopiraju u pozadini trenutak nakon svake izmjene. Ako se Reacut neočekivano zatvori, nude se pri sljedećem pokretanju.
 	Channel	Kanal
 	Channel Blur	Zamućenje kanala
 	Channel Mix	Miks kanala
@@ -1846,7 +1846,7 @@
 	Hard Limiter	Tvrdi limiter
 	Hard Mix	Tvrdo miješanje
 	Hardware decoding	Hardversko dekodiranje
-	Hardware decoding: Auto uses the system's video decoder (VideoToolbox on macOS, Media Foundation on Windows, VA-API or NVDEC for H.264 and HEVC on Linux) for the streams it supports, and FilmCraft's own decoder for everything else or if the hardware fails. Media that is already open keeps its decoder until it is reopened.	Hardversko dekodiranje: Automatski koristi video dekoder sistema (VideoToolbox na macOS-u, Media Foundation na Windowsu, VA-API ili NVDEC za H.264 i HEVC na Linuxu) za tokove koje podržava, a FilmCraftov vlastiti dekoder za sve ostalo ili ako hardver zakaže. Mediji koji su već otvoreni zadržavaju svoj dekoder dok se ponovo ne otvore.
+	Hardware decoding: Auto uses the system's video decoder (VideoToolbox on macOS, Media Foundation on Windows, VA-API or NVDEC for H.264 and HEVC on Linux) for the streams it supports, and Reacut's own decoder for everything else or if the hardware fails. Media that is already open keeps its decoder until it is reopened.	Hardversko dekodiranje: Automatski koristi video dekoder sistema (VideoToolbox na macOS-u, Media Foundation na Windowsu, VA-API ili NVDEC za H.264 i HEVC na Linuxu) za tokove koje podržava, a Reacutov vlastiti dekoder za sve ostalo ili ako hardver zakaže. Mediji koji su već otvoreni zadržavaju svoj dekoder dok se ponovo ne otvore.
 	Head Size	Veličina glave
 	Heart	Srce
 	Height	Visina
@@ -2118,7 +2118,7 @@
 	Night	Noć
 	No Motion	Bez pokreta
 	No Scroll	Bez pomjeranja
-	No plugins are installed. Changes will take effect the next time you start FilmCraft.	Nema instaliranih dodataka. Promjene će stupiti na snagu pri sljedećem pokretanju FilmCrafta.
+	No plugins are installed. Changes will take effect the next time you start Reacut.	Nema instaliranih dodataka. Promjene će stupiti na snagu pri sljedećem pokretanju Reacuta.
 	Noise	Šum
 	Noise & Grain	Šum i zrno
 	Noise (Legacy)	Šum (naslijeđeno)
@@ -2549,7 +2549,7 @@
 	Template Properties	Svojstva predloška
 	Text Animator	Animator teksta
 	Text Color	Boja teksta
-	The media cache holds render previews of unsaved projects and other files FilmCraft can recreate. Deleting them is always safe; FilmCraft rebuilds them as needed.	Keš medija sadrži preglede iscrtavanja nesačuvanih projekata i druge datoteke koje FilmCraft može ponovo kreirati. Njihovo brisanje je uvijek sigurno; FilmCraft ih ponovo gradi po potrebi.
+	The media cache holds render previews of unsaved projects and other files Reacut can recreate. Deleting them is always safe; Reacut rebuilds them as needed.	Keš medija sadrži preglede iscrtavanja nesačuvanih projekata i druge datoteke koje Reacut može ponovo kreirati. Njihovo brisanje je uvijek sigurno; Reacut ih ponovo gradi po potrebi.
 	Thickness	Debljina
 	Tile Gradient	Popločaj gradijent
 	Tilt	Nagib
@@ -2746,7 +2746,7 @@
 	System Compatibility Report	Izvještaj o kompatibilnosti sistema
 	no GPU adapter: the CPU compositor is used	nema GPU adaptera: koristi se CPU kompozitor
 	Avid Log Exchange	Avid Log Exchange
-	FilmCraft Project	FilmCraft projekat
+	Reacut Project	Reacut projekat
 	{name} Selection.fcproj	{name} odabir.fcproj
 	{name} (Simplified)	{name} (pojednostavljeno)
 	Find in:	Pronađi u:
@@ -2886,7 +2886,7 @@
 	Start Queue	Pokreni red
 	Stop	Zaustavi
 	Clear Finished	Očisti završene
-	Not supported by FilmCraft's encoders yet	FilmCraftovi koderi to još ne podržavaju
+	Not supported by Reacut's encoders yet	Reacutovi koderi to još ne podržavaju
 	Sequence name	Naziv sekvence
 	Folder	Folder
 	Preset	Unaprijed postavljeno
@@ -2976,7 +2976,7 @@
 	Drag a clip to slide it between its neighbours.	Prevucite klip da ga kližete između susjednih.
 	Drag to scroll the timeline.	Prevucite za pomjeranje vremenske linije.
 	Click to zoom in; Opt-click to zoom out.	Kliknite za uvećanje; Opt-klik za umanjenje.
-	FilmCraft hit an error	FilmCraft je naišao na grešku
+	Reacut hit an error	Reacut je naišao na grešku
 	Details: {path}	Detalji: {path}
 	Opened {url}	Otvoreno: {url}
 	(empty)	(prazno)
@@ -2987,6 +2987,9 @@
 	AAC Audio	AAC zvuk
 	AAC Audio 48 kHz 320 kbps	AAC zvuk 48 kHz 320 kbps
 	MPEG-4 audio (.m4a), stereo 48 kHz AAC-LC at 320 kbps	MPEG-4 zvuk (.m4a), stereo 48 kHz AAC-LC pri 320 kbps
+	MP3	MP3
+	MP3 48 kHz 320 kbps	MP3 48 kHz 320 kbps
+	MPEG audio (.mp3), joint stereo 48 kHz at 320 kbps	MPEG zvuk (.mp3), joint stereo 48 kHz pri 320 kbps
 	AIFF	AIFF
 	AIFF 48 kHz 16-bit	AIFF 48 kHz 16-bit
 	AIFF, stereo 48 kHz 16-bit PCM	AIFF, stereo 48 kHz 16-bit PCM
@@ -3536,8 +3539,8 @@
 	Composite in Linear Color	Kompozit u linearnoj boji
 	Auto Tone Map Media (HDR and log into SDR)	Automatsko tonsko mapiranje medija (HDR i log u SDR)
 	Configure…	Podesi…
-	Not supported in FilmCraft yet	Još nije podržano u FilmCraftu
-	FilmCraft always composites in linear light	FilmCraft uvijek kompozitira u linearnom svjetlu
+	Not supported in Reacut yet	Još nije podržano u Reacutu
+	Reacut always composites in linear light	Reacut uvijek kompozitira u linearnom svjetlu
 	Loop marked range	Ponavljaj označeni raspon
 	Play Source	Reprodukuj izvor
 	Source Play/Stop	Reprodukuj/zaustavi izvor
@@ -3595,7 +3598,7 @@
 	Opens in your web browser: {url}	Otvara se u vašem web pregledniku: {url}
 	Saves this session's log and shows it in your file manager.	Čuva zapisnik ove sesije i prikazuje ga u upravitelju datoteka.
 	Shows a report on this computer.	Prikazuje izvještaj o ovom računaru.
-	Shows the version, community links and credits in a FilmCraft window.	Prikazuje verziju, veze zajednice i zasluge u FilmCraft prozoru.
+	Shows the version, community links and credits in a Reacut window.	Prikazuje verziju, veze zajednice i zasluge u Reacut prozoru.
 	Couldn't open your web browser	Nije moguće otvoriti vaš web preglednik
 	Open this address in your browser yourself:	Sami otvorite ovu adresu u svom pregledniku:
 	The control server is disabled: FILMCRAFT_CONTROL_TOKEN must contain 64 random hex characters (see docs/control-protocol.md)	Kontrolni server je onemogućen: FILMCRAFT_CONTROL_TOKEN mora sadržavati 64 nasumična heksadecimalna znaka (pogledajte docs/control-protocol.md)
@@ -3607,15 +3610,56 @@
 	Start: {tc}	Početak: {tc}
 	End: {tc}	Kraj: {tc}
 	Duration: {tc}	Trajanje: {tc}
-	Animate zoom, scrolling and menus	Animiraj zumiranje, pomicanje i menije
+	Animate zoom, scrolling and menus	Animiraj zumiranje, pomjeranje i menije
 	Reset Interface Zoom	Vrati zumiranje interfejsa
 	Track Color	Boja trake
 	Open a sequence to search its graphics	Otvorite sekvencu da pretražite njene grafike
 	No text graphics in this sequence. Add text with the Type tool.	U ovoj sekvenci nema tekstualnih grafika. Dodajte tekst alatom za tekst.
 	No matching text.	Nema odgovarajućeg teksta.
-	H.265 (HEVC) needs a hardware encoder (NVENC on NVIDIA GPUs, VideoToolbox on macOS); none was found on this machine, and FilmCraft has no software H.265 encoder yet. Choose H.264 or ProRes instead.	H.265 (HEVC) zahtijeva hardverski enkoder (NVENC na NVIDIA GPU-ovima, VideoToolbox na macOS-u); na ovom računaru nije pronađen nijedan, a FilmCraft još nema softverski H.265 enkoder. Umjesto toga odaberite H.264 ili ProRes.
-	AV1 needs a hardware encoder; none was found on this machine, and FilmCraft has no software AV1 encoder yet.	AV1 zahtijeva hardverski enkoder; na ovom računaru nije pronađen nijedan, a FilmCraft još nema softverski AV1 enkoder.
-	Hardware decoding: Auto uses the system's video decoder (VideoToolbox on macOS, Media Foundation on Windows, VA-API for H.264 and HEVC on Linux) for the streams it supports, and FilmCraft's own decoder for everything else or if the hardware fails. Media that is already open keeps its decoder until it is reopened.	Hardversko dekodiranje: Automatski koristi video dekoder sistema (VideoToolbox na macOS-u, Media Foundation na Windowsu, VA-API za H.264 i HEVC na Linuxu) za tokove koje podržava, a FilmCraftov vlastiti dekoder za sve ostalo ili ako hardver zakaže. Mediji koji su već otvoreni zadržavaju svoj dekoder dok se ponovo ne otvore.
+	H.265 (HEVC) needs a hardware encoder (NVENC on NVIDIA GPUs, VideoToolbox on macOS); none was found on this machine, and Reacut has no software H.265 encoder yet. Choose H.264 or ProRes instead.	H.265 (HEVC) zahtijeva hardverski enkoder (NVENC na NVIDIA GPU-ovima, VideoToolbox na macOS-u); na ovom računaru nije pronađen nijedan, a Reacut još nema softverski H.265 enkoder. Umjesto toga odaberite H.264 ili ProRes.
+	AV1 needs a hardware encoder; none was found on this machine, and Reacut has no software AV1 encoder yet.	AV1 zahtijeva hardverski enkoder; na ovom računaru nije pronađen nijedan, a Reacut još nema softverski AV1 enkoder.
+	Hardware decoding: Auto uses the system's video decoder (VideoToolbox on macOS, Media Foundation on Windows, VA-API for H.264 and HEVC on Linux) for the streams it supports, and Reacut's own decoder for everything else or if the hardware fails. Media that is already open keeps its decoder until it is reopened.	Hardversko dekodiranje: Automatski koristi video dekoder sistema (VideoToolbox na macOS-u, Media Foundation na Windowsu, VA-API za H.264 i HEVC na Linuxu) za tokove koje podržava, a Reacutov vlastiti dekoder za sve ostalo ili ako hardver zakaže. Mediji koji su već otvoreni zadržavaju svoj dekoder dok se ponovo ne otvore.
+	1/2	1/2
+	Audio Names	Nazivi zvuka
+	Audio output failed: playing without sound (check Settings ▸ Audio Hardware)	Audio izlaz nije uspio: reprodukcija bez zvuka (provjerite Postavke ▸ Audio hardver)
+	Audio output is not responding: playing without sound (check Settings ▸ Audio Hardware)	Audio izlaz ne odgovara: reprodukcija bez zvuka (provjerite Postavke ▸ Audio hardver)
+	Center at Cut	Centriraj na rezu
+	Change Sequence Settings	Promijeni postavke sekvence
+	Change the sequence to match the clip's settings?	Promijeniti sekvencu da odgovara postavkama klipa?
+	Chapter Marker	Marker poglavlja
+	Check for Updates…	Provjeri ažuriranja…
+	Checking for updates…	Provjera ažuriranja…
+	Clip Mismatch Warning	Upozorenje o neusklađenom klipu
+	Clip: {settings}	Klip: {settings}
+	Comment Marker	Marker komentara
+	Could not check for updates:\n{error}	Nije moguće provjeriti ažuriranja:\n{error}
+	Custom Start	Prilagođeni početak
+	Edit Marker…	Uredi marker…
+	End at Cut	Završi na rezu
+	Enter a positive duration within the supported speed range.	Unesite pozitivno trajanje unutar podržanog raspona brzine.
+	Reacut Updates	Reacut ažuriranja
+	Reacut {version} is currently the newest version available.	Reacut {version} je trenutno najnovija dostupna verzija.
+	Flash Cue Point	Flash tačka znaka
+	In:	Ulaz:
+	Invalid duration: {error}	Nevažeće trajanje: {error}
+	Keep Existing Settings	Zadrži postojeće postavke
+	Looks for a newer Reacut release and offers to update.	Traži noviju verziju Reacuta i nudi ažuriranje.
+	Marker Color:	Boja markera:
+	Options:	Opcije:
+	Replace	Zamijeni
+	Replace File	Zamijeni datoteku
+	Segmentation Marker	Marker segmentacije
+	Select one clip (or a linked clip) in the Timeline, or one item in the Project panel, to rename	Odaberite jedan klip (ili povezani klip) na vremenskoj liniji ili jednu stavku u panelu Projekat da biste je preimenovali
+	Sequence: {settings}	Sekvenca: {settings}
+	Set Work Area Bar In Point	Postavi ulaznu tačku trake radnog područja
+	Set Work Area Bar Out Point	Postavi izlaznu tačku trake radnog područja
+	Show Audio Names	Prikaži nazive zvuka
+	Show Video Names	Prikaži nazive videa
+	Start at Cut	Počni na rezu
+	This clip does not match the sequence settings.	Ovaj klip ne odgovara postavkama sekvence.
+	Video Names	Nazivi videa
+	Web Link	Web veza
+	“{file}” already exists in “{folder}”. Do you want to replace it?	„{file}” već postoji u „{folder}”. Želite li ga zamijeniti?
 
 # Export: H.264 High 10 and all-intra (#1221).
 	High 10	High 10
@@ -3632,3 +3676,85 @@
 	Toggle Color Grading Section	Uključi/isključi odjeljak gradacije boja
 	Color Grading Section	Odjeljak gradacije boja
 	Read Video Scopes	Očitaj video skopove
+
+# Strings added on main since (markers, custom colors, preset import, export messages).
+	1 frame ({seconds} s)	1 sličica ({seconds} s)
+	A range marker needs a positive duration	Marker raspona zahtijeva pozitivno trajanje
+	Add Custom Color	Dodaj prilagođenu boju
+	Add Track	Dodaj traku
+	Add and apply	Dodaj i primijeni
+	Add color	Dodaj boju
+	Add custom color	Dodaj prilagođenu boju
+	Add custom color…	Dodaj prilagođenu boju…
+	Author	Autor
+	Caption Export Settings	Postavke izvoza titlova
+	Chapter	Poglavlje
+	Choose Color…	Odaberi boju…
+	Choose color with system picker	Odaberi boju sistemskim biračem
+	Color picker	Birač boja
+	Color selected markers	Oboji odabrane markere
+	Custom Color…	Prilagođena boja…
+	Delete Marker	Izbriši marker
+	Delete Markers	Izbriši markere
+	Delete Track	Izbriši traku
+	Delete selected markers	Izbriši odabrane markere
+	Duration (frames):	Trajanje (sličice):
+	Edit Custom Color	Uredi prilagođenu boju
+	Edit Marker	Uredi marker
+	Edit Markers	Uredi markere
+	Edit color	Uredi boju
+	Editing or removing a swatch leaves assigned colors unchanged.	Uređivanje ili uklanjanje uzorka boje ne mijenja već dodijeljene boje.
+	Enter a valid HH:MM:SS:FF timecode	Unesite važeći vremenski kod HH:MM:SS:FF
+	Enter a valid HTTP or HTTPS URL without credentials	Unesite važeći HTTP ili HTTPS URL bez pristupnih podataka
+	Enter six hex digits, for example FF80C0.	Unesite šest heksadecimalnih cifara, na primjer FF80C0.
+	Exported {path} as {format}, from its file extension	Izvezeno {path} kao {format}, prema ekstenziji datoteke
+	From preset file:	Iz datoteke predloška:
+	Hex	Hex
+	Hex color	Hex boja
+	Imported {n} preset(s)	Uvezeno predložaka: {n}
+	Imported {n} preset(s); not imported: {error}	Uvezeno predložaka: {n}; nije uvezeno: {error}
+	Imported {n} preset(s); {skipped} skipped	Uvezeno predložaka: {n}; preskočeno: {skipped}
+	Imported {n} preset(s); {skipped} skipped, {warnings} with unsupported parameters	Uvezeno predložaka: {n}; preskočeno: {skipped}, s nepodržanim parametrima: {warnings}
+	Imported {n} preset(s); {warnings} with unsupported parameters	Uvezeno predložaka: {n}; s nepodržanim parametrima: {warnings}
+	Manage Colors	Upravljaj bojama
+	Manage Colors…	Upravljaj bojama…
+	Marker changed or was removed. Reopen it to continue.	Marker je promijenjen ili uklonjen. Ponovo ga otvorite da nastavite.
+	Marker owner is unavailable	Vlasnik markera nije dostupan
+	Next	Sljedeće
+	No markers	Nema markera
+	No matching markers	Nema odgovarajućih markera
+	No presets folder: the app has no data directory	Nema foldera predložaka: aplikacija nema direktorij podataka
+	No saved colors	Nema sačuvanih boja
+	No sequence open	Nijedna sekvenca nije otvorena
+	No source clip open	Nijedan izvorni klip nije otvoren
+	Notes	Bilješke
+	Open Link	Otvori vezu
+	Open Presets Folder	Otvori folder predložaka
+	Opens this address in your web browser	Otvara ovu adresu u vašem web pregledniku
+	Preset library is up to date	Biblioteka predložaka je ažurna
+	Preset library updated	Biblioteka predložaka je ažurirana
+	Preset library updated: {imported} loaded, {removed} removed	Biblioteka predložaka je ažurirana: učitano {imported}, uklonjeno {removed}
+	Previous	Prethodno
+	Project Colors	Boje projekta
+	Range marker	Marker raspona
+	Remove Custom Color	Ukloni prilagođenu boju
+	Remove saved color	Ukloni sačuvanu boju
+	Responsive Design – Time remaps the graphic's layer keyframes; clip effects like Opacity and Motion keep media time	Responzivni dizajn – Vrijeme preslikava ključne sličice sloja grafike; efekti klipa poput Neprozirnosti i Kretanja zadržavaju vrijeme medija
+	Save color	Sačuvaj boju
+	Scan Presets Folder	Skeniraj folder predložaka
+	Search markers	Pretraži markere
+	Search name, notes, author	Pretraži naziv, bilješke, autora
+	Select all	Odaberi sve
+	Select all visible markers	Odaberi sve vidljive markere
+	Sequence: {name}	Sekvenca: {name}
+	Set as Default Transition	Postavi kao zadani prijelaz
+	Source In/Out is only 1 frame. Choose Entire Source to export the whole sequence.	Izvorni ulaz/izlaz traje samo 1 sličicu. Odaberite Cijeli izvor da izvezete cijelu sekvencu.
+	Source: {name}	Izvor: {name}
+	Source: {name} (shared source markers)	Izvor: {name} (dijeljeni markeri izvora)
+	System color picker unavailable: {error}	Sistemski birač boja nije dostupan: {error}
+	Time is outside the supported range	Vrijeme je izvan podržanog raspona
+	URL	URL
+	When enabled, GIF transparency is on/off: alpha below 128 is transparent; 128 and above is opaque.	Kada je omogućeno, GIF prozirnost je uključena/isključena: alfa ispod 128 je prozirna; 128 i više je neprozirna.
+	{count} selected	Odabrano: {count}
+	{frames} frames ({seconds} s)	{frames} sličica ({seconds} s)
+	{name} already exists, so nothing was exported. To replace it, choose it in the save dialog.	{name} već postoji, pa ništa nije izvezeno. Da ga zamijenite, odaberite ga u dijalogu za čuvanje.
