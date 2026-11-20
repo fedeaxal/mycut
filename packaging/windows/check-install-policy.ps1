@@ -50,6 +50,18 @@ try {
   if ('INSTALLFOLDER' -notin $secureProperties) {
     throw 'The selected installation folder must survive elevation (secure INSTALLFOLDER).'
   }
+  # Every payload the package promises must be in the compiled file table. A runtime DLL dropped
+  # here installs cleanly and then kills the launcher before its first window
+  # ("sherpa-onnx-c-api.dll was not found"), so assert it against the MSI rather than trusting
+  # package.ps1's staging. FileName is "short|long" when the two differ: compare the long name.
+  $fileNames = @(foreach ($row in (Read-Rows $database 'SELECT `FileName` FROM `File`' 1)) { ($row[0] -split '\|')[-1] })
+  $payloads = @()
+  # Optional: a policy without a payload inventory simply skips this check.
+  if ($policy.PSObject.Properties['payloads']) { $payloads = @($policy.payloads) }
+  foreach ($payload in $payloads) {
+    $name = Split-Path -Leaf $payload
+    if ($name -notin $fileNames) { throw "The package is missing $name." }
+  }
   if ($policy.mode -eq 'perUser') {
     if ($properties.ContainsKey('ALLUSERS')) { throw 'Launcher must remain per-user; machine self-update is not part of this change.' }
     if ($properties['UpgradeCode'].Trim('{}') -ne $policy.upgradeCode) { throw 'Launcher upgrade identity changed.' }

@@ -848,7 +848,7 @@ fn run_negotiation(
         .map_err(|e| format!("set_local_description: {e}"))?;
     // 诊断:协商出的 answer 里是否带 transport-cc(rtcp-fb / extmap)。
     // 若带,Chrome 会启用 TWCC 并忽略 REMB,收不到 feedback → 码率清零。
-    log::info!("phone answer sdp:\n{}", answer.sdp);
+    // log::info!("phone answer sdp:\n{}", answer.sdp);
     // The answer's SDP already carries the host candidate — `create_answer`
     // marshals the locally added candidate (a=candidate ... typ host) into
     // each media section, in valid RFC 4566 order (after c=, before the next

@@ -141,6 +141,14 @@ $crt = Get-ChildItem 'C:/Program Files/Microsoft Visual Studio/*/*/VC/Redist/MSV
 if (-not $crt) { throw 'no Visual C++ redistributable found on the runner (the /MD executables need it)' }
 Write-Output "CRT DLLs from $($crt.FullName)"
 Copy-Item (Join-Path $crt.FullName '*.dll') $Stage
+# Nothing above is optional, so both the MSI's RuntimeLibraries group and the portable ZIP always
+# carry them. The flag must be *assigned* — when the staging above became unconditional the
+# assignments were dropped with the old optional branches, and both packages shipped with no DLLs
+# at all: the launcher died with "sherpa-onnx-c-api.dll was not found" before its first window.
+$HasRuntimeLibs = 1
+# `<Files Include>` needs at least one match: emit the licences group only when staging produced
+# files for it (a local build without FFMPEG_DIR may stage none).
+$HasRuntimeLicences = if (Get-ChildItem -LiteralPath $Lic -File -Recurse -ErrorAction SilentlyContinue) { 1 } else { 0 }
 
 # ---- font notices for the MSI ------------------------------------------------------------------
 # The portable ZIP already carries these notices; stage the complete files before MSI creation too.
@@ -162,7 +170,7 @@ Invoke-Native 'wix build' {
   wix build (Join-Path $PSScriptRoot 'filmcraft.wxs') -arch $Arch -ext WixToolset.UI.wixext `
     -d "Version=$MsiVersion" -d "BinDir=$Stage" -d "IconPath=$(Join-Path $Root 'assets\app-icon\filmcraft.ico')" `
     -d "DocsDir=$Docs" -d "HasCraftFontLicences=$HasCraftFontLicences" `
-    -d "LicDir=$Lic" -d "HasRuntimeLibraries=$HasRuntimeLibs" `
+    -d "LicDir=$Lic" -d "HasRuntimeLibraries=$HasRuntimeLibs" -d "HasRuntimeLicences=$HasRuntimeLicences" `
     -o $Msi
 }
 # Check the compiled scope, path and registration contract before signing.
@@ -196,6 +204,12 @@ if ($env:CRAFT_FONTS_DIR) {
   foreach ($lic in Get-ChildItem -Path (Join-Path $env:CRAFT_FONTS_DIR 'fonts\*\OFL.txt') -ErrorAction SilentlyContinue) {
     Copy-Item $lic.FullName (Join-Path $Portable "OFL-$($lic.Directory.Name).txt")
   }
+}
+# Assert what the ZIP is built from: a package without its DLLs installs cleanly and then dies at
+# launch ("sherpa-onnx-c-api.dll was not found") — exactly how these packages regressed. The
+# MSI's compiled file table is checked the same way by check-install-policy.ps1.
+foreach ($dll in @('sherpa-onnx-c-api.dll', 'onnxruntime.dll', 'DirectML.dll', 'vcruntime140.dll')) {
+  if (-not (Test-Path (Join-Path $Portable $dll))) { throw "the portable package is missing $dll" }
 }
 $Zip = Join-Path $Dist "filmcraft-$Version-windows-$Arch-portable.zip"
 Remove-Item -Force $Zip -ErrorAction SilentlyContinue

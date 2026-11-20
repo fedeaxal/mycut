@@ -131,9 +131,9 @@ impl MediaH264Decoder {
         }
         // 每 150 帧报一次投递速率：静帧时区分"解码停了"和"投递后停了"。
         let emitted = EMITTED.fetch_add(1, Ordering::Relaxed) + 1;
-        if emitted % 150 == 0 {
-            log::info!("phone video: {emitted} frames decoded and delivered");
-        }
+        // if emitted % 150 == 0 {
+        //     log::info!("phone video: {emitted} frames decoded and delivered");
+        // }
         self.video.send(DecodedPicture {
             width,
             height,

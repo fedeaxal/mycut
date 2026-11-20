@@ -13,7 +13,11 @@
   "payloads": [
     "NOTICE",
     "filmcraft-cli.exe",
-    "filmcraft.exe"
+    "filmcraft.exe",
+    "sherpa-onnx-c-api.dll",
+    "onnxruntime.dll",
+    "DirectML.dll",
+    "vcruntime140.dll"
   ],
   "registry": [
     [

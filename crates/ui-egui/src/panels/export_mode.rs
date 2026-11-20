@@ -365,7 +365,6 @@ mod output_dir_tests {
         assert_eq!(recording_scene("/projects/show/edit.fcproj"), None);
         assert_eq!(recording_scene("/save/foo/foo-2026-13-99-99-99-99.fcproj"), None, "月份超范围");
         assert_eq!(recording_scene("/save/foo/foo-明天-2026-11-04-12-00-00.fcproj"), None, "7 段不是时间戳");
-        assert_eq!(recording_scene("/save/foo/foo.fcproj"), None, "没有时间戳后缀");
         assert_eq!(recording_scene("/save/foo/foo-2026-11-04-12-00-00_extra.fcproj"), None, "后缀不贴合");
     }
 

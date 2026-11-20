@@ -43,6 +43,7 @@ foreach ($arch in $Architectures) {
     -d "BinDir=$stage" -d "IconPath=$(Join-Path $root $policy.icon)" `
     -d "DocsDir=$(Join-Path $stage 'docs')" -d "ModelsDir=$(Join-Path $stage 'models')" `
     -d "AppNoticesDir=$(Join-Path $stage 'notices')" -d 'HasCraftFontLicences=1' -d 'HasCli=1' `
+    -d 'HasRuntimeLibraries=1' `
     -d "BannerBmp=$(Join-Path $stage 'banner.bmp')" -d "DialogBmp=$(Join-Path $stage 'dialog.bmp')" `
     -d "UiBannerBmp=$(Join-Path $stage 'banner.bmp')" -d "UiDialogBmp=$(Join-Path $stage 'dialog.bmp')" `
     -d "LicenseRtf=$(Join-Path $stage 'licence.rtf')" -o $msi @($policy.localization | ForEach-Object { '-loc'; Join-Path $PSScriptRoot $_ })

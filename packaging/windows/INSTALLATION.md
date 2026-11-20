@@ -23,7 +23,9 @@ On Windows with WiX 5.0.2 and its matching UI/Util extensions:
 The script builds x64, x86 and arm64 packages with deliberately non-executable payloads. It
 uses the actual package source and compiled database. A safe Windows Installer session checks
 24 scope/registration/maintenance cases, remembered and explicit custom folders, sequencing,
-upgrade identity and the original registration inventory recorded in `install-policy.json`.
+upgrade identity and the original registration and payload inventory recorded in
+`install-policy.json` — including that the runtime DLLs the launcher needs at startup are in the
+compiled file table.
 The release packaging script runs the compiled checker before signing. Packaging CI runs the
 small fixture builds without compiling the Rust application.
 
