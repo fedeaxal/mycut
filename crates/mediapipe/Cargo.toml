@@ -26,12 +26,9 @@ tracy-client = "0.18.0"
 # 平台选择。ndarray feature 供输入张量走 ndarray 视图（ort 侧也是 0.17，与
 # 本项目统一）。
 #
-# Apple Silicon：ort 官方预编译（`download-binaries`，ort 的默认行为）——
-# ort-sys 构建期从 pyke CDN 下载与本版 ort 配对构建的静态库链进程序
-# （ms@1.28.0 的 coreml flavor），不再随包分发 libonnxruntime.dylib。
-# `tls-native` 是 download-binaries 的硬性要求（构建脚本的 CDN 下载要有 TLS
-# provider）。静态化后 ORT 的图优化级别也不要显式设（见
-# utils::session_builder）。
+# Apple Silicon：load-dynamic，运行时加载官方 dylib（CI 的 macos 包随包携带
+# 1.23.2 的 osx-arm64 库；1.23.0 被微软撤回，由 1.23.2 取代）。coreml
+# feature 只把 CoreML EP 的 API 绑定编译进来，EP 本体在 dylib 里。
 #
 # Windows：同样 ort 官方预编译（directml flavor，DirectML EP 内置）。
 # 这要求宿主动态 CRT（pyke 的静态库是 /MD 构建，/MT 宿主链接必败），
@@ -43,18 +40,16 @@ tracy-client = "0.18.0"
 # 任何 onnxruntime.dll）。
 #
 # 其余目标（Intel macOS / Linux）：官方没有 Intel mac 的预编译，走
-# load-dynamic（CI 的 x86_64 mac 包携带 1.23.0 dylib：微软给 osx-x86_64
-# 发布的最后一版；ort 未开任何 api-* feature 时请求 C API 17，1.17 起的
-# 运行时都能应答）。这两个目标 Auto 恒 CPU。
+# load-dynamic（CI 的 x86_64 mac 包携带 1.23.2 dylib；ort 未开任何 api-*
+# feature 时请求 C API 17，1.17 起的运行时都能应答）。这两个目标 Auto 恒
+# CPU——Intel 核显上 CoreML 实测反而更慢。
 # 注意：代码里 init_from 的调用点按同一目标划分 cfg——若调整这里的目标
 # 归属，需同步 facelandmark-cli 与 reaction::face::detect。
 [target.'cfg(all(target_os = "macos", target_arch = "aarch64"))'.dependencies]
 ort = { version = "2.0.0-rc.13", default-features = false, features = [
     "std",
     "ndarray",
-    "download-binaries",
-    "tls-native",
-    "copy-dylibs",
+    "load-dynamic",
     "coreml",
 ] }
 

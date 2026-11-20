@@ -153,8 +153,9 @@ if [[ -n "${ONNXRUNTIME_DIR:-}" && -f "$ONNXRUNTIME_DIR/libonnxruntime.dylib" ]]
   cp "$ONNXRUNTIME_DIR/LICENSE" "$licenses/onnxruntime-LICENSE.txt"
   cp "$ONNXRUNTIME_DIR/ThirdPartyNotices.txt" "$licenses/onnxruntime-ThirdPartyNotices.txt"
 else
-  # The arm64 leg statically links ort's official prebuilt — no dylib to carry,
-  # but the ORT licence text still rides in the bundle (committed in-tree).
+  # No staged dylib (a local build without ONNXRUNTIME_DIR) — no dylib to
+  # carry, but the ORT licence text still rides in the bundle (committed
+  # in-tree).
   if [[ -f "$ROOT/packaging/OnnxRuntime-LICENSE.txt" ]]; then
     mkdir -p "$licenses"
     cp "$ROOT/packaging/OnnxRuntime-LICENSE.txt" "$licenses/OnnxRuntime-LICENSE.txt"

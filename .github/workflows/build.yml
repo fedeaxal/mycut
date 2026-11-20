@@ -230,17 +230,19 @@ jobs:
             triplet: arm64-osx-dynamic
             suffix: arm64-macos
             arch: aarch64
-            ort-version: "1.28.0"
+            ort-version: "1.23.2"
             ort-arch: arm64
           - runner: macos-15-intel
             triplet: x64-osx-dynamic
             suffix: x86_64-macos
             arch: x86_64
-            # 1.23 is the last release Microsoft shipped an osx-x86_64 binary
-            # for. It loads because `ort`, with no api-* feature enabled
-            # anywhere in the tree, requests C API version 17 — its feature
-            # ladder's floor — which every runtime from 1.17 on answers.
-            ort-version: "1.23.0"
+            # 1.23.2 is the last release Microsoft shipped an osx-x86_64
+            # binary for, and the replacement for 1.23.0, which was withdrawn
+            # upstream (404). It loads because `ort`, with no api-* feature
+            # enabled anywhere in the tree, requests C API version 17 — its
+            # feature ladder's floor — which every runtime from 1.17 on
+            # answers.
+            ort-version: "1.23.2"
             ort-arch: x86_64
     env:
       # What makes the bundle self-contained: vcpkg's dylibs are named
@@ -306,32 +308,28 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-
 
-      # The face pipeline's inference engine, as on Windows: ort's official
-      # prebuilt, statically linked at build time (CoreML EP compiled into
-      # the arm64 build — its dependencies are every one system frameworks,
-      # so nothing extra ships beside the executable). The download below is
-      # only for the x86_64 matrix leg: pyke's CDN has no Intel-mac prebuilt
-      # (ort 2.0.0-rc.13's minimum supported targets end at Intel macOS), so
-      # that leg builds with `load-dynamic` and carries Microsoft's dylib —
-      # 1.23.0, the last release Microsoft shipped an osx-x86_64 binary for.
-      # It loads because `ort`, with no api-* feature enabled anywhere in
-      # the tree, requests C API version 17, which every runtime from 1.17
-      # on answers. It arrives ad-hoc signed and is re-signed ad hoc by the
-      # packaging script, which is what Apple silicon requires of it.
-      #
-      # The 1.28 dylib is built for macOS 14: on 13 the face features degrade
-      # the way a missing library degrades them, and nothing else notices.
+      # The face pipeline's inference engine, on both macOS legs: Microsoft's
+      # official dylib, downloaded from their GitHub release and loaded at run
+      # time (`load-dynamic` — the facelandmark Cargo.toml splits macOS this
+      # way; the Windows job still statically links pyke's prebuilt). Both
+      # legs carry 1.23.2: the last release Microsoft shipped an osx binary
+      # for, and the replacement for 1.23.0, which was withdrawn upstream —
+      # the 404 that broke this job before. It loads because `ort`, with no
+      # api-* feature enabled anywhere in the tree, requests C API version
+      # 17, which every runtime from 1.17 on answers; the CoreML EP ships
+      # inside the dylib, which is what the arm64 EP list asks for. It
+      # arrives ad-hoc signed and is re-signed ad hoc by the packaging
+      # script, which is what Apple silicon requires of it.
       - name: Download ONNX Runtime
-        if: matrix.arch == 'x86_64'
         run: |
           set -euo pipefail
           version="${{ matrix.ort-version }}"
           root="onnxruntime-osx-${{ matrix.ort-arch }}-$version"
           curl -fsSL "https://github.com/microsoft/onnxruntime/releases/download/v$version/$root.tgz" -o "$RUNNER_TEMP/$root.tgz"
           mkdir -p .onnxruntime
-          # The whole package, then the files that ship: 1.23's members are
-          # named `./onnxruntime-...` where 1.28's are not, and the extracted
-          # tree is the same either way.
+          # The whole package, then the files that ship: the tarball nests
+          # everything under `./onnxruntime-...`, and the cp below strips
+          # that level.
           tar -xzf "$RUNNER_TEMP/$root.tgz" -C .onnxruntime
           cp ".onnxruntime/$root/lib/libonnxruntime.dylib" \
              ".onnxruntime/$root/LICENSE" \
@@ -339,8 +337,8 @@ jobs:
           ls -l .onnxruntime
 
       # Builds (--target this matrix arch), assembles FilmCraft.app with the
-      # FFmpeg dylib beside the executable (and, on Intel, the ONNX Runtime
-      # dylib the step above downloaded), checks the bundle is self-contained,
+      # FFmpeg and ONNX Runtime dylibs beside the executable, checks the
+      # bundle is self-contained,
       # signs ad hoc (no certificate here: Gatekeeper asks about a downloaded
       # copy — docs/install.md says how to let it open) and lays it on a
       # drag-to-Applications DMG, plus the headless CLI zip.
