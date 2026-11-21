@@ -544,6 +544,16 @@ fn apply_for(options: &mut NativeOptions, mode: Mode, backend_override: Option<B
     // Pro: the device is lost and the window never opens. `WGPU_VALIDATION_INDIRECT_CALL=1` turns
     // the check back on.
     create.instance_descriptor.flags = create.instance_descriptor.flags.difference(wgpu::InstanceFlags::VALIDATION_INDIRECT_CALL).with_env();
+    // Reaction's floating overlays (the danmaku bar, the prompter) live on transparent viewports
+    // of this instance, so the surface must composite with alpha. The default HWND swapchain
+    // (`DxgiFromHwnd`) reports only `Opaque`, and DWM then composites the frame opaquely — the
+    // overlays keep their background on Windows. A DirectComposition visual swapchain
+    // (`DxgiFromVisual`) offers `PreMultiplied`, which egui-wgpu picks. Same pin as the
+    // standalone reaction's `pin_windows_backend`.
+    if windows {
+        create.instance_descriptor.backend_options.dx12.presentation_system =
+            wgpu::Dx12SwapchainKind::DxgiFromVisual;
+    }
     match mode {
         // DirectX 12 on Windows, not eframe's default (`WGPU_BACKEND`, else PRIMARY | GL, which
         // includes GL): creating the GL backend can crash inside AMD's atio6axx.dll before

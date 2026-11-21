@@ -10,7 +10,7 @@
   <?define HasRuntimeLicences=0 ?>
   <?endif?>
   <Package Name="Reacut" Manufacturer="Learning Machines LLC" Version="$(var.Version)" UpgradeCode="31E6FB14-9DBC-41DD-B24B-26B71FB31B62" Scope="perUserOrMachine" Compressed="yes" Language="1033">
-    <SummaryInformation Description="Reacut video editor" Manufacturer="Learning Machines LLC" />
+    <SummaryInformation Description="Reacut" Manufacturer="Learning Machines LLC" />
     <?include $(sys.SOURCEFILEDIR)install-policy.wxi?>
     <!-- Same-version upgrades let successive pre-releases of one X.Y.Z replace each other
          (MSI versions are numeric, so 1.2.3-rc.1 and 1.2.3-rc.2 are both 1.2.3). -->
@@ -73,7 +73,7 @@
       <Component Id="FilmcraftApp" Guid="15933017-925B-4963-8992-52000EB26AAA">
         <File Id="FilmcraftNotice" Source="$(var.BinDir)\NOTICE" KeyPath="no" />
         <File Id="FilmcraftExe" Source="$(var.BinDir)\reacut.exe" KeyPath="yes">
-          <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="Reacut" Description="Reacut video editor" WorkingDirectory="INSTALLFOLDER" Advertise="yes" Icon="FilmcraftIcon.ico" IconIndex="0" />
+          <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="Reacut" Description="Reacut" WorkingDirectory="INSTALLFOLDER" Advertise="yes" Icon="FilmcraftIcon.ico" IconIndex="0" />
         </File>
 
         <RegistryValue Root="HKMU" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\reacut.exe" Value="[#FilmcraftExe]" Type="string" />

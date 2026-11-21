@@ -21,7 +21,7 @@ mod windows {
         let mut res = winresource::WindowsResource::new();
         res.set_icon("../../assets/app-icon/filmcraft.ico")
             .set("ProductName", "Reacut")
-            .set("FileDescription", "Reacut video editor")
+            .set("FileDescription", "Reacut")
             .set("LegalCopyright", "Copyright (c) the Reacut contributors. MIT OR Apache-2.0.")
             .set("OriginalFilename", "reacut.exe")
             .set("InternalName", "reacut");
