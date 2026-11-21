@@ -545,11 +545,12 @@ fn apply_for(options: &mut NativeOptions, mode: Mode, backend_override: Option<B
     // the check back on.
     create.instance_descriptor.flags = create.instance_descriptor.flags.difference(wgpu::InstanceFlags::VALIDATION_INDIRECT_CALL).with_env();
     // Reaction's floating overlays (the danmaku bar, the prompter) live on transparent viewports
-    // of this instance, so the surface must composite with alpha. The default HWND swapchain
-    // (`DxgiFromHwnd`) reports only `Opaque`, and DWM then composites the frame opaquely — the
-    // overlays keep their background on Windows. A DirectComposition visual swapchain
-    // (`DxgiFromVisual`) offers `PreMultiplied`, which egui-wgpu picks. Same pin as the
-    // standalone reaction's `pin_windows_backend`.
+    // of this instance, so the surface must composite with per-pixel alpha. The default HWND
+    // swapchain (`DxgiFromHwnd`) presents as an opaque layer over the window, so transparency can
+    // never show; a DirectComposition visual swapchain (`DxgiFromVisual`) has it. But the DComp
+    // image sits under the window's redirection surface, which reaction's `redirection` worker
+    // keeps painted transparent — the two halves are one fix, see that module's docs. Same pin
+    // as the standalone reaction's `pin_windows_backend`.
     if windows {
         create.instance_descriptor.backend_options.dx12.presentation_system =
             wgpu::Dx12SwapchainKind::DxgiFromVisual;
