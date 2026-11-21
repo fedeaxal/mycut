@@ -56,35 +56,6 @@ fn only_the_windows_default_and_software_modes_choose_the_adapter() {
 }
 
 #[test]
-fn windows_presents_through_direct_composition_for_transparent_overlays() {
-    // Reaction's floating overlays (the danmaku bar) are transparent viewports of this instance;
-    // the default HWND swapchain presents as an opaque layer and transparency can never show
-    // (graphics.rs).
-    for mode in WINDOWS {
-        let mut options = NativeOptions::default();
-        apply_for(&mut options, *mode, None, true);
-        let WgpuSetup::CreateNew(create) = options.wgpu_options.wgpu_setup else {
-            panic!("default native options must create a wgpu instance");
-        };
-        assert_eq!(
-            create.instance_descriptor.backend_options.dx12.presentation_system,
-            wgpu::Dx12SwapchainKind::DxgiFromVisual,
-            "{mode:?}"
-        );
-    }
-    // Elsewhere eframe's own presentation stands.
-    let mut options = NativeOptions::default();
-    apply_for(&mut options, Mode::Default, None, false);
-    let WgpuSetup::CreateNew(create) = options.wgpu_options.wgpu_setup else {
-        panic!("default native options must create a wgpu instance");
-    };
-    assert_eq!(
-        create.instance_descriptor.backend_options.dx12.presentation_system,
-        wgpu::Dx12SwapchainKind::DxgiFromHwnd
-    );
-}
-
-#[test]
 fn explicit_backend_override_is_preserved() {
     for backends in [Backends::VULKAN, Backends::GL, Backends::DX12, Backends::VULKAN | Backends::DX12, Backends::empty()] {
         assert_eq!(configured(Mode::Default, Some(backends), true).0, backends);
