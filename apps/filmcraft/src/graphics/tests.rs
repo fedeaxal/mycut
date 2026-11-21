@@ -57,9 +57,9 @@ fn only_the_windows_default_and_software_modes_choose_the_adapter() {
 
 #[test]
 fn windows_presents_through_direct_composition_for_transparent_overlays() {
-    // Reaction's floating overlays (danmaku bar, prompter) sit on transparent viewports of this
-    // instance; the default HWND swapchain presents as an opaque layer and transparency can never
-    // show (graphics.rs).
+    // Reaction's floating overlays (the danmaku bar) are transparent viewports of this instance;
+    // the default HWND swapchain presents as an opaque layer and transparency can never show
+    // (graphics.rs).
     for mode in WINDOWS {
         let mut options = NativeOptions::default();
         apply_for(&mut options, *mode, None, true);
