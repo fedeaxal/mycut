@@ -544,16 +544,17 @@ fn apply_for(options: &mut NativeOptions, mode: Mode, backend_override: Option<B
     // Pro: the device is lost and the window never opens. `WGPU_VALIDATION_INDIRECT_CALL=1` turns
     // the check back on.
     create.instance_descriptor.flags = create.instance_descriptor.flags.difference(wgpu::InstanceFlags::VALIDATION_INDIRECT_CALL).with_env();
-    // DirectComposition 的交换链才有 alpha 合成(wgpu 文档原话):DX12 默认的
-    // `DxgiFromHwnd` 直挂 HWND,只报 `CompositeAlphaMode::Opaque`,surface 便
-    // 拿不到带透明的合成——弹幕悬浮窗(见 `native_options` 的
-    // `with_transparent`)在 Windows 上整窗一块不透明黑底,macOS 不走这里、
-    // 不受影响。代价只是 RenderDoc 抓不了帧,与共享纹理的互操作无关。
-    // 环境变量已指定时让它赢:wgpu 文档把它当手动开关,这里只在未设置时
-    // 补上默认值。
-    if windows && std::env::var_os("WGPU_DX12_PRESENTATION_SYSTEM").is_none() {
+    // A swapchain made from the HWND only supports `CompositeAlphaMode::Opaque`, so a viewport
+    // that asks for a transparent surface (the Reaction page's danmaku bar) would show its clear
+    // colour (black) wherever egui leaves the background empty: egui-wgpu finds no alpha mode
+    // with transparency and falls back to `Auto`. A swapchain composed through DirectComposition
+    // does report premultiplied alpha, which is what egui-wgpu then picks. The option only
+    // affects the DX12 backend; the other backends ignore it.
+    if windows {
+        // `WGPU_DX12_PRESENTATION_SYSTEM` still wins, so a broken composition
+        // stack can be debugged without a rebuild.
         create.instance_descriptor.backend_options.dx12.presentation_system =
-            wgpu::Dx12SwapchainKind::DxgiFromVisual;
+            wgpu::Dx12SwapchainKind::from_env().unwrap_or(wgpu::Dx12SwapchainKind::DxgiFromVisual);
     }
     match mode {
         // DirectX 12 on Windows, not eframe's default (`WGPU_BACKEND`, else PRIMARY | GL, which
