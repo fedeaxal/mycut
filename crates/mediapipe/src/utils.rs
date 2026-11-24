@@ -227,7 +227,7 @@ fn commit_session(
     match attempt(ep) {
         Ok(session) => Ok(session),
         Err(error) if ep == Ep::Auto && cfg!(target_os = "windows") => {
-            eprintln!("face: DirectML 不可用（{error}），改用 CPU 推理");
+            log::warn!("face: DirectML 不可用（{error}），改用 CPU 推理");
             attempt(Ep::Cpu)
         }
         Err(error) => Err(error),

@@ -19,6 +19,8 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg"]
 fast_image_resize = "5.1.4"
 ndarray = { version = "0.17", features = ["rayon"] }
 rayon = "1.10.0"
+# 执行提供者回退等记录进宿主的统一日志文件（树内其余纯 Rust 库同一门面）
+log = { workspace = true }
 # 仅在通过 `--tracy` 启动采集时才有开销，平时为空操作，保留原工程的性能分析能力
 tracy-client = "0.18.0"
 

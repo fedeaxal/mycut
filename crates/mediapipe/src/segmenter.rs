@@ -12,6 +12,9 @@
 //! （weights/selfie_multiclass_256x256.onnx，6 类逐像素分类，人像质量高于
 //! selfie_segmenter）。实测其输出通道 0 为 background 的 logit，
 //! 人像掩码 = 1 − softmax(background)，其余通道语义未逐一校准。
+//!
+//! 执行提供者：Windows 上分割会话固定走 CPU——API 的 `Ep::Auto` 在
+//! [`session_ep`] 里解析成 CPU，原因见该函数的文档。
 
 use std::path::Path;
 
@@ -71,6 +74,22 @@ fn f32_slice(buf: &[u8]) -> &[f32] {
     unsafe { std::slice::from_raw_parts(buf.as_ptr().cast::<f32>(), buf.len() / 4) }
 }
 
+/// 分割会话的执行提供者：Windows 上 `Ep::Auto` 落 CPU。
+///
+/// Windows 包携带的 onnxruntime.dll 是微软 DirectML 版 1.24.4（CI 从 NuGet
+/// 拉取，见 .github/workflows/build.yml）：selfie_segmenter 的三个 `Resize`
+/// （动态 sizes、linear、half_pixel）在 DML EP 上执行时抛 E_INVALIDARG
+/// (0x80070057)——会话建得起来、第一次 `proc_image` 就失败，表情抓拍因此
+/// 退回无 alpha 的原帧；multiclass 连会话初始化都过不去。两个模型都是 256²
+/// 输入（CPU 单次 12ms / 134ms），抓拍是事件级频率，GPU 没有收益；显式
+/// `Ep::DirectML` 仍按调用方要求尝试。
+fn session_ep(ep: Ep) -> Ep {
+    match ep {
+        Ep::Auto if cfg!(target_os = "windows") => Ep::Cpu,
+        other => other,
+    }
+}
+
 pub struct SelfieSegmenter {
     session: ort::session::Session,
     resizer: Resizer,
@@ -81,7 +100,7 @@ pub struct SelfieSegmenter {
 
 impl SelfieSegmenter {
     pub fn new<P: AsRef<Path>>(model: P, ep: Ep, intra_threads: usize) -> anyhow::Result<Self> {
-        let session = build_session(model, ep, intra_threads)?;
+        let session = build_session(model, session_ep(ep), intra_threads)?;
         let dims = crate::utils::tensor_dims(session.inputs().first())?;
         anyhow::ensure!(
             dims.len() == 4 && dims[1] == 3 && dims[2] == MASK_SIZE as i64 && dims[3] == MASK_SIZE as i64,
@@ -198,7 +217,7 @@ pub struct MulticlassSegmenter {
 
 impl MulticlassSegmenter {
     pub fn new<P: AsRef<Path>>(model: P, ep: Ep, intra_threads: usize) -> anyhow::Result<Self> {
-        let session = build_session(model, ep, intra_threads)?;
+        let session = build_session(model, session_ep(ep), intra_threads)?;
         let dims = crate::utils::tensor_dims(session.inputs().first())?;
         anyhow::ensure!(
             dims.len() == 4
@@ -281,5 +300,24 @@ impl MulticlassSegmenter {
             height: MASK_SIZE,
             data,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Windows 的 Auto 必须避开 DirectML：随包的 DML 版运行时跑不动两个
+    /// 分割模型的 Resize（见 [`session_ep`]），落 CPU 是这条线唯一能出掩码
+    /// 的选择；其余平台 Auto 保持不动，显式请求照旧。
+    #[test]
+    fn auto_segmentation_avoids_directml_on_windows() {
+        if cfg!(target_os = "windows") {
+            assert_eq!(session_ep(Ep::Auto), Ep::Cpu);
+        } else {
+            assert_eq!(session_ep(Ep::Auto), Ep::Auto);
+        }
+        assert_eq!(session_ep(Ep::DirectML), Ep::DirectML);
+        assert_eq!(session_ep(Ep::Cpu), Ep::Cpu);
     }
 }
