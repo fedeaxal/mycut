@@ -2947,6 +2947,7 @@ dependencies = [
  "anyhow",
  "fast_image_resize",
  "image",
+ "log",
  "ndarray",
  "ort",
  "rayon",
