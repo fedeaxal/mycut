@@ -78,6 +78,19 @@
 
         <RegistryValue Root="HKMU" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\reacut.exe" Value="[#FilmcraftExe]" Type="string" />
       <RegistryValue Root="HKMU" Key="Software\Reacut" Name="InstallDir" Value="[INSTALLFOLDER]" Type="string" />
+
+        <!-- Explorer opens a .fcproj with Reacut: the extension names our ProgId, whose open verb
+             passes the project path to the executable (the `[project.fcproj]` argument the app
+             already accepts, like `open -a` on macOS). HKMU writes the association in the context
+             the user chose — HKCU for a per-user install, HKLM for everyone — as the App Paths
+             entry above does. Windows 11 keeps a per-user file-choice dialog ahead of these
+             values; they are the default for accounts that never picked another program. -->
+        <RegistryValue Root="HKMU" Key="Software\Classes\.fcproj" Value="Reacut.Project" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\.fcproj" Name="Content Type" Value="application/x-filmcraft" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\Reacut.Project" Value="Reacut Project" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\Reacut.Project" Name="FriendlyTypeName" Value="Reacut Project" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\Reacut.Project\DefaultIcon" Value="[#FilmcraftExe],0" Type="string" />
+        <RegistryValue Root="HKMU" Key="Software\Classes\Reacut.Project\shell\open\command" Value='"[#FilmcraftExe]" "%1"' Type="string" />
       </Component>
 
       <Component Id="FilmcraftCli">

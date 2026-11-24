@@ -12,7 +12,7 @@ use craft_update::{CheckResultDialog, CheckResultResponse};
 /// The update feed lives on our own server instead of the GitHub API, so a check is never
 /// rate-limited and works where GitHub is unreachable. It answers GitHub releases JSON.
 #[cfg(not(target_arch = "wasm32"))]
-const UPDATE_FEED_URL: &str = "https://ap.iiinb.cn/reacut_update";
+const UPDATE_FEED_URL: &str = "https://app.iiinb.cn/reacut_update";
 
 /// Asks [`UPDATE_FEED_URL`] instead of the GitHub API. The release repo stays [`crate::UPDATE_APP`]:
 /// its JSON (list or single release) is parsed with the same rules, so download URLs remain pinned
