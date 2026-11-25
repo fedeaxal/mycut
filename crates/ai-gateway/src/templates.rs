@@ -28,16 +28,25 @@ pub const COMPRESS_SYSTEM: &str = "你是反应视频的剧情记录员。把观
 pub const TRANSCRIPT_SEGMENT_CHARS: usize = 6000;
 
 /// 人物表上下文（含一句话人设）：多轮对话 system 与 Map 分段摘要共用。
+///
+/// 条目允许只给演员名或只给角色名（查询不要求两者配对），两条都空视为
+/// 坏条目丢弃。
 pub fn build_cast_context(cast: &[Value]) -> String {
     let mut lines: Vec<String> = Vec::new();
     for entry in cast.iter().take(12) {
-        let character = entry["character"].as_str().unwrap_or("");
-        let actor = entry["actor"].as_str().unwrap_or("");
+        let character = entry["character"].as_str().unwrap_or("").trim();
+        let actor = entry["actor"].as_str().unwrap_or("").trim();
+        let line = match (character.is_empty(), actor.is_empty()) {
+            (false, false) => format!("- {character}（{actor} 扮演）"),
+            (false, true) => format!("- {character}"),
+            (true, false) => format!("- {actor}（演员）"),
+            (true, true) => continue,
+        };
         // JS entry.profile 为 truthy 才走带 profile 分支（"" 视为无）
-        match entry["profile"].as_str().filter(|p| !p.is_empty()) {
-            Some(profile) => lines.push(format!("- {character}（{actor} 扮演）：{profile}")),
-            None => lines.push(format!("- {character}（{actor} 扮演）")),
-        }
+        lines.push(match entry["profile"].as_str().filter(|p| !p.is_empty()) {
+            Some(profile) => format!("{line}：{profile}"),
+            None => line,
+        });
     }
     if lines.is_empty() {
         return String::new();
@@ -125,12 +134,24 @@ pub fn build_system_prompt(params: &TurnParams) -> String {
 
     let mut parts: Vec<String> = Vec::new();
     parts.push(format!(
-        "你正在陪用户一起观看《{movie}》并做reaction反应视频。"
+        r#"你是一位坐在镜头前做Live Reaction的资深、毒舌、阅片无数的音乐/视频区UP主。无论面对什么视频（MV、音乐现场、搞笑短片、影视剪辑），你都能瞬间进入状态。正在观看《{movie}》。
+【核心任务：做个耳朵尖、眼睛毒的活人】
+1. 全频段雷达开启（视觉+听觉并重，音频优先）：
+   - 听觉细节：不仅要听歌词，更要死死盯住【编曲中的神仙细节】。如果音频里突然出现标志性乐器（例如：《双节棍》间奏突然切入的二胡/民族乐器、摇滚里的唢呐、电音里的变调、突然的留白或呼吸声）、伴奏变故、和声走向，你必须第一时间抓住并大呼小叫！
+   - 视觉细节：捕捉镜头的神反转、演员/歌手的微表情、运镜的骚操作。禁止胡思乱想编造画面（绝对不能出现视频里没有的东西，如没见过的角色或场景）。
+2. 情绪价值与共鸣：
+   - 你的评价要能让观众“直呼：卧槽，这都被他听出来了/发现了！”。
+   - 善于玩反差、吐槽、制造梗、回忆杀。点评要像和朋友实时语音连麦，充满口语化和烟火气。
+3. 严格铁律：
+   - 严禁单纯当解说员去复述画面。
+   - 拒绝千篇一律的机械开头
+   - 如果某一段实在平淡无奇，直接跳过不发，绝不为了填补时间而硬尬。
+   - 记住前面的内容，可以玩连续梗、打脸或前后呼应。"#
     ));
     parts.push(format!("{style}"));
     if !cast_context.is_empty() {
         parts.push(format!(
-            "{cast_context}\n表中之外的人名按同音/近音就近对应到表中角色，不要新造人物；「他/她/那个人」等代称结合上下文指代表中角色。"
+            "{cast_context}\n表中之外的人名按同音/近音就近对应到表中人物，不要新造人物；「他/她/那个人」等代称结合上下文指代表中人物。"
         ));
     }
     if !recap.is_empty() {
@@ -138,7 +159,7 @@ pub fn build_system_prompt(params: &TurnParams) -> String {
             "【前情回顾】（截至上一集的剧情档案，仅供理解人物关系与背景）：\n{recap}\n前情仅供参考：前情与本集字幕冲突时以本集字幕为准；前情里没有的剧情不要拿来断言本集；仅当本集内容呼应到前情（伏笔回收/老梗/角色回归）时才提及它。"
         ));
     }
-    parts.push("大多数剧集片段其实很平淡：日常对话、过场、寒暄、缓慢推进都不是点评的时机。只有出现笑点、冲突、反转、高能画面或关键剧情时才点评；剧情平淡或没有值得说的点时，commentary 只写一个「无」字，不要硬找话说——空结果是对的，不是失误。".to_string());
+    // parts.push("大多数剧集片段其实很平淡：日常对话、过场、寒暄、缓慢推进都不是点评的时机。只有出现笑点、冲突、反转、高能画面或关键剧情时才点评；剧情平淡或没有值得说的点时，commentary 只写一个「无」字，不要硬找话说——空结果是对的，不是失误。".to_string());
     parts.push("用户会持续发来当前听到的字幕：行首 [分:秒] 是录制内时间，部分行带「（情感·事件）」前缀（视频声音的辅助标注，可能有误）。批末可能附带当时的画面截图（文本里逐张标注了时间）——结合字幕、声音标注与画面判断剧情，画面与字幕冲突时以画面为准；除非字幕或画面明确支持，不要断言发生了什么。".to_string());
     parts.push(
         "具体剧情时带上它发生的时间（如 [3:24] 的那句），方便对照；不确定的剧情宁可不提。"
@@ -212,7 +233,7 @@ pub fn title_user(
         ai_style
     };
     format!(
-        "这是一期观看了《{movie}》的反应视频的整集内容要点（按字幕分段整理，自动识别可能有错别字）{}。请为这期视频起一个吸睛的标题、写一段简介、并给出 10 个利于搜索曝光的标签。\n整集内容要点：\n{}\n{}\n\n风格要求：{style}。\n\n标签要求（搜索引擎优化，让更多用户搜得到）：恰好 10 个；第一个必须是 \"reaction\"；其余 9 个按被搜索的可能性从高到低覆盖——剧名与主要角色名、题材/类型词（如「悬疑」「都市情感」）、平台热门通用词（如「影视解说」「追剧」「下饭」）、内容亮点的具体长尾词；用单词或两三个字的短语，不重复、不成句。\n\n返回格式：{{\"title\":\"不超过 30 字的标题\",\"description\":\"两三句简介\",\"tags\":[\"reaction\",\"标签2\",\"标签3\",\"标签4\",\"标签5\",\"标签6\",\"标签7\",\"标签8\",\"标签9\",\"标签10\"]}}",
+        "这是一期观看了《{movie}》的反应视频的整集内容要点（按字幕分段整理，自动识别可能有错别字）{}。请为这期视频起一个吸睛/为搜索优化的标题、写一段简介、并给出 10 个利于搜索曝光的标签。\n整集内容要点：\n{}\n{}\n\n风格要求：{style}。\n\n标签要求（搜索引擎优化，让更多用户搜得到）：恰好 10 个；第一个必须是 \"reaction\"；其余 9 个按被搜索的可能性从高到低覆盖——剧名与主要角色名、题材/类型词（如「悬疑」「都市情感」）、平台热门通用词（如「影视解说」「追剧」「下饭」）、内容亮点的具体长尾词；用单词或两三个字的短语，不重复、不成句。\n\n返回格式：{{\"title\":\"不超过 30 字的标题\",\"description\":\"两三句简介\",\"tags\":[\"reaction\",\"标签2\",\"标签3\",\"标签4\",\"标签5\",\"标签6\",\"标签7\",\"标签8\",\"标签9\",\"标签10\"]}}",
         if has_frames { "和代表性画面截图" } else { "" },
         summaries.join("\n\n"),
         frame_lines.join("\n"),
@@ -253,12 +274,22 @@ pub fn recap_messages(
     ])
 }
 
-/// 演员表查询的 messages（fetchCastFromAi）。
+/// 人物/识别易错词查询的 messages（fetchCastFromAi）。
+///
+/// 人物部分不要求「演员名 ↔ 角色名」一一对应：两者都是同一个人的一部分，
+/// 只知道其中一条就照实只写一条——模型对冷门剧的配对常常靠猜，硬要配对
+/// 只会编造。`terms` 是人物之外、语音识别容易听错/写错的专有名词（事件
+/// 名/物体名/地名等），调用方把它并入热词文件做识别偏置。
+///
+/// JSON 契约按 DeepSeek JSON Output 的要求写（
+/// <https://api-docs.deepseek.com/zh-cn/guides/json_mode/>）：prompt 含
+/// 小写 json 字样并给出格式样例（`response_format` 由网关的 json_mode
+/// 打开，见 lib.rs chat_body）。改提示词时这两点都不能丢，否则端点 400。
 pub fn cast_messages(movie_name: &str) -> Value {
     json!([
         { "role": "system", "content": CAST_SYSTEM },
         { "role": "user", "content": format!(
-            "电影/电视剧/综艺《{movie_name}》的主要演员及其在剧中的角色名是什么？列出最多 18 条。每个角色附一句话的人设/人物关系简介（profile）。同时给出每个角色名的普通话拼音（小写字母+数字标调，多音节连写无分隔，例如角色\"玄戒\"写 xuan2jie4，轻声用 1）。\n返回格式：{{\"cast\":[{{\"actor\":\"演员名\",\"character\":\"角色名\",\"pinyin\":\"jiao3se4ming2\",\"profile\":\"一句话人设与人物关系\"}}]}}"
+            "电影/电视剧/综艺《{movie_name}》里出现了哪些人、哪些语音识别容易听错的专有名词？请分两部分列出：\n1. 人物（最多 30 人）：演员本名与剧中角色名都是这个人的一部分，能确定对应关系就两条都写，只知道其中一条就只写知道的那条，不要为了凑配对而编造。每人附一句话的人设/人物关系简介（profile），并给出角色名的普通话拼音（小写字母+数字标调，多音节连写无分隔，例如角色\"玄戒\"写 xuan2jie4，轻声用 1；没有角色名就留空串）。\n2. 识别易错词（最多 30 个，每个不超过 6 个字）：事件名、物体名、地名、组织机构名、作品名、品牌、外语音译、生僻词等语音识别容易听错/写错的专有名词（人名已在上面列过，不必重复），只列确信与该作品相关的词，按出现可能性从高到低排序。\n返回格式（只含 json，不要 markdown 围栏、不要解释）：{{\"cast\":[{{\"actor\":\"演员名，不知道就空串\",\"character\":\"角色名，不知道就空串\",\"pinyin\":\"角色名拼音，没有角色名就空串\",\"profile\":\"一句话人设与人物关系\"}}],\"terms\":[\"易错词1\",\"易错词2\"]}}"
         ) },
     ])
 }
@@ -371,6 +402,56 @@ mod tests {
         e
     }
 
+    fn turn_base() -> TurnParams {
+        TurnParams {
+            movie_name: String::new(),
+            ai_style: String::new(),
+            cast: vec![],
+            recap: None,
+            vision_on: false,
+            semantic_on: false,
+            hotwords_on: false,
+        }
+    }
+
+    /// DeepSeek JSON Output 的两条硬性要求之一:Prompt 里必须出现小写
+    /// `json` 字样,否则端点直接 400。这里把网关所有会开 json_mode 的
+    /// 请求（lib.rs dispatch:cast / hotwords / title 恒开,turn 恒开,
+    /// review 仅在违规筛查开启时开）的提示词逐个核对——改模板时这条
+    /// 测试是最后一道闸。
+    #[test]
+    fn every_json_mode_prompt_contains_json_word() {
+        let cases: [(&str, String); 6] = [
+            (
+                "turn",
+                build_system_prompt(&TurnParams { hotwords_on: true, ..turn_base() }),
+            ),
+            (
+                "review-vision",
+                build_system_prompt(&TurnParams { vision_on: true, ..turn_base() }),
+            ),
+            (
+                "review-semantic",
+                build_system_prompt(&TurnParams { semantic_on: true, ..turn_base() }),
+            ),
+            (
+                "cast-system",
+                cast_messages("剧")[0]["content"].as_str().unwrap().to_string(),
+            ),
+            (
+                "hotwords-system",
+                hotwords_messages("剧")[0]["content"].as_str().unwrap().to_string(),
+            ),
+            ("title-system", TITLE_SYSTEM.to_string()),
+        ];
+        for (feature, prompt) in cases {
+            assert!(
+                prompt.contains("json"),
+                "{feature} 的提示词缺少小写 json 字样（DeepSeek JSON Output 会 400）"
+            );
+        }
+    }
+
     #[test]
     fn cast_context_empty_and_filled() {
         assert_eq!(build_cast_context(&[]), "");
@@ -385,18 +466,40 @@ mod tests {
     }
 
     #[test]
+    fn cast_context_allows_single_name_entries() {
+        // 查询不要求演员名与角色名配对：只知道一条的人物照常进表。
+        let cast = vec![
+            cast_entry("", "沈腾", Some("主角")),
+            cast_entry("张驰", "", None),
+            cast_entry("", "", None),
+        ];
+        let context = build_cast_context(&cast);
+        assert_eq!(
+            context,
+            "【人物表】（字幕中的人名已经同音词纠正为下表写法）：\n- 沈腾（演员）：主角\n- 张驰"
+        );
+        // 两条都空的条目不进表；全空返回空串（不注入人物表段）
+        assert_eq!(build_cast_context(&[cast_entry("", "", None)]), "");
+    }
+
+    #[test]
+    fn cast_messages_json_contract() {
+        let messages = cast_messages("甄嬛传");
+        assert_eq!(messages[0]["content"], json!(CAST_SYSTEM));
+        let prompt = messages[1]["content"].as_str().unwrap();
+        // DeepSeek JSON Output 的硬性要求：小写 json 字样 + 格式样例
+        assert!(prompt.contains("只含 json"));
+        assert!(prompt.contains("\"cast\""));
+        assert!(prompt.contains("\"terms\""));
+        // 人物部分不要求演员名与角色名配对（只知道一条就只写一条）
+        assert!(prompt.contains("都是这个人的一部分"));
+        assert!(prompt.contains("只知道其中一条就只写知道的那条"));
+        // 人物之外还要给 ASR 易错的事件名/物体名/地名等
+        assert!(prompt.contains("事件名、物体名、地名"));
+    }
+
+    #[test]
     fn system_prompt_off_and_on() {
-        fn turn_base() -> TurnParams {
-            TurnParams {
-                movie_name: String::new(),
-                ai_style: String::new(),
-                cast: vec![],
-                recap: None,
-                vision_on: false,
-                semantic_on: false,
-                hotwords_on: false,
-            }
-        }
         let off = build_system_prompt(&turn_base());
         assert!(off.starts_with("你正在陪用户一起观看《一部影视作品》并做reaction反应视频。"));
         assert!(off.contains("说话风格为轻松真诚。"));

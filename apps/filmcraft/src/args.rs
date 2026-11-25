@@ -67,7 +67,8 @@ pub fn parse(env_control_port: Option<String>, args: impl IntoIterator<Item = Os
         control_port: None,
         control_input_only: false,
         files: Vec::new(),
-        demo: true,
+        // A bare start is an empty project; the demo project is `--demo` or a menu action.
+        demo: false,
         startup_flag: false,
         recover: None,
         data_dir: None,
@@ -232,7 +233,7 @@ mod tests {
                 control_port: None,
                 control_input_only: false,
                 files: vec![],
-                demo: true,
+                demo: false,
                 startup_flag: false,
                 recover: None,
                 data_dir: None,

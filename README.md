@@ -258,7 +258,7 @@ The trailer and the grades in these screenshots were built exactly this way, by 
 New to editing in Reacut? Follow [Getting started: video fades and audio volume keyframes](docs/getting-started-fades.md).
 
 ```sh
-cargo run --release -p reacut                           # the desktop app, with a demo project
+cargo run --release -p reacut                           # the desktop app, with an empty project
 cargo run --release -p reacut -- --control 9876         # plus the JSON-lines control server
 cargo run --release -p reacut-cli -- commands           # list every engine command
 cargo run --release -p reacut-cli -- mcp                # MCP server (headless)

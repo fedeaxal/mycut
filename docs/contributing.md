@@ -25,8 +25,8 @@ macOS.
 ## 2. Build and run
 
 ```sh
-cargo run --release -p reacut                      # desktop app with the demo project
-cargo run --release -p reacut -- --empty           # start without the demo project
+cargo run --release -p reacut                      # desktop app, empty project
+cargo run --release -p reacut -- --demo            # start with the demo project
 cargo run --release -p reacut -- --control 9876    # plus the JSON-lines control server
 cargo run --release -p reacut -- a.mp4 b.wav       # import media (or open a .fcproj)
 cargo run --release -p reacut-cli -- commands      # list engine commands

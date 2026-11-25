@@ -29,11 +29,22 @@ fn envelope_err(error: String) -> String {
     json!({ "ok": false, "error": error }).to_string()
 }
 
+/// 输出 token 上限的缺省值（payload 可用 `config.maxTokens` 覆盖）。
+///
+/// DeepSeek JSON Output 指南要求显式设置 `max_tokens`，否则长 JSON 会在
+/// 输出中途被截断。本项目最大的一单是人物表查询（30 人 + 30 个易错词，
+/// 约 2–2.5k token），4096 留了一倍余量，也正好是 deepseek-chat 的出厂
+/// 默认；模型上限更低的端点会以 400 拒收，[`run_chat`] 去掉可选参数重试。
+const DEFAULT_MAX_TOKENS: u64 = 4096;
+
 #[derive(Clone)]
 struct RequestConfig {
     base_url: String,
     api_key: String,
     model: String,
+    /// 输出 token 上限：payload 的 `config.maxTokens` 可覆盖，缺省
+    /// [`DEFAULT_MAX_TOKENS`]。
+    max_tokens: u64,
 }
 
 /// 与 JS fetch 一致：baseUrl 不做任何清洗（存储层已规范化）。
@@ -50,6 +61,10 @@ fn parse_config(payload: &Value) -> Result<RequestConfig, String> {
             .filter(|m| !m.is_empty())
             .ok_or("AI 模型未配置")?
             .to_string(),
+        max_tokens: config["maxTokens"]
+            .as_u64()
+            .filter(|limit| *limit > 0)
+            .unwrap_or(DEFAULT_MAX_TOKENS),
     })
 }
 
@@ -139,6 +154,7 @@ fn chat_body(
     messages: &Value,
     temperature: Option<f64>,
     json_mode: bool,
+    max_tokens: Option<u64>,
 ) -> String {
     let mut body = serde_json::Map::new();
     body.insert("model".into(), json!(cfg.model));
@@ -147,18 +163,29 @@ fn chat_body(
     if let Some(t) = temperature {
         body.insert("temperature".into(), json!(t));
     }
+    if let Some(limit) = max_tokens {
+        // DeepSeek JSON Output 指南：显式给足输出预算，否则长 JSON 会被
+        // 截断。None 只出现在端点拒收可选参数后的降级重试里。
+        body.insert("max_tokens".into(), json!(limit));
+    }
     if json_mode {
-        // DeepSeek JSON Output：服务端强制输出可解析的 JSON。前提是 prompt
-        // 含小写 json 字样（模板已内嵌，见 templates.rs），否则端点报 400
+        // DeepSeek JSON Output 的两个硬性前提之一：response_format 必须是
+        // {"type":"json_object"}（另一个是 prompt 含小写 json 字样——
+        // 模板已内嵌，templates.rs 的
+        // every_json_mode_prompt_contains_json_word 锁定），否则端点 400。
         body.insert("response_format".into(), json!({ "type": "json_object" }));
     }
     Value::Object(body).to_string()
 }
 
-/// 组装并发送，返回首个 choice 文本。json_mode=true 时两级兜底（DeepSeek
+/// 组装并发送，返回首个 choice 文本。
+///
+/// 两个可选参数（`response_format` / `max_tokens`）按端点兼容性兜底：
+/// 端点以 HTTP 400/422 拒收（不支持 JSON 模式、或 `max_tokens` 超出模型
+/// 上限，如 DeepSeek 推理模型与老端点）→ 去掉这两个参数降级重试一次，
+/// 此时非 JSON 输出由消费端宽容解析。JSON 模式下还有第二级兜底（DeepSeek
 /// json_mode 指南）：模型输出无法识别为 JSON 时 content 被替换成空格 →
-/// 原参数重试一次；端点不接受 response_format（HTTP 400/422，如 DeepSeek
-/// 推理模型）→ 去掉该参数降级重试一次，容忍非 JSON 输出由消费端宽容解析。
+/// 原参数重试一次。
 fn run_chat(
     cfg: &RequestConfig,
     messages: Value,
@@ -166,20 +193,18 @@ fn run_chat(
     timeout_ms: f64,
     json_mode: bool,
 ) -> Result<String, String> {
-    let send = |json_mode: bool| {
-        let body = chat_body(cfg, &messages, temperature, json_mode);
+    let send = |json_mode: bool, max_tokens: Option<u64>| {
+        let body = chat_body(cfg, &messages, temperature, json_mode, max_tokens);
         chat_once(cfg, &body, timeout_ms).map(|raw| first_choice_content(&raw))
     };
-    let mut result = send(json_mode);
-    if json_mode {
-        if matches!(&result, Ok(text) if text.trim().is_empty()) {
-            result = send(true);
-        } else if matches!(
-            &result,
-            Err(error) if error.starts_with("HTTP 400") || error.starts_with("HTTP 422")
-        ) {
-            result = send(false);
-        }
+    let mut result = send(json_mode, Some(cfg.max_tokens));
+    if matches!(
+        &result,
+        Err(error) if error.starts_with("HTTP 400") || error.starts_with("HTTP 422")
+    ) {
+        result = send(false, None);
+    } else if json_mode && matches!(&result, Ok(text) if text.trim().is_empty()) {
+        result = send(true, Some(cfg.max_tokens));
     }
     result
 }
@@ -301,6 +326,13 @@ fn map_reduce_summaries(cfg: &RequestConfig, payload: &Value) -> Vec<String> {
 /// 同步执行一个 feature，返回内容值（调用方要信封就用 [`invoke`]）。
 ///
 /// 各 feature 的请求组装+发送（返回首个 choice 文本）。
+///
+/// json_mode（`response_format={"type":"json_object"}`，见 [`chat_body`]）
+/// 只用在回复必须是 JSON 的 feature 上：cast / hotwords / title 恒开，
+/// turn 恒开，review 仅在违规筛查开启时开（与提示词里的 JSON 契约同一
+/// 条件）。DeepSeek 的硬性要求是这些请求的提示词必须含小写 json 字样，
+/// 由 templates.rs 的 `every_json_mode_prompt_contains_json_word` 锁定。
+/// 每个请求都显式带 `max_tokens`（缺省 [`DEFAULT_MAX_TOKENS`]）。
 pub fn dispatch(feature: &str, payload: &Value) -> Result<Value, String> {
     match feature {
         // 演员表查询（渲染端负责解析与校验）
@@ -593,5 +625,58 @@ pub fn run_download(kind: &str, payload: &Value, emit: Arc<dyn Fn(Value) + Send 
     match result {
         Ok(value) => emit(json!({ "event": "result", "ok": true, "value": value })),
         Err(error) => emit(json!({ "event": "result", "ok": false, "error": error })),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config() -> RequestConfig {
+        RequestConfig {
+            base_url: "http://localhost".into(),
+            api_key: String::new(),
+            model: "m".into(),
+            max_tokens: DEFAULT_MAX_TOKENS,
+        }
+    }
+
+    #[test]
+    fn json_body_carries_response_format_and_token_budget() {
+        // DeepSeek JSON Output 的两条硬性要求：response_format 由 json_mode
+        // 打开、max_tokens 显式给出（缺省值见 DEFAULT_MAX_TOKENS）。
+        let body: Value = serde_json::from_str(&chat_body(
+            &config(),
+            &json!([{ "role": "user", "content": "json" }]),
+            None,
+            true,
+            Some(DEFAULT_MAX_TOKENS),
+        ))
+        .unwrap();
+        assert_eq!(body["response_format"], json!({ "type": "json_object" }));
+        assert_eq!(body["max_tokens"], json!(DEFAULT_MAX_TOKENS));
+        assert_eq!(body["stream"], json!(false));
+
+        // 降级重试（参数被端点拒收）不带这两个可选参数，也不带温度以外
+        // 的额外字段。
+        let body: Value =
+            serde_json::from_str(&chat_body(&config(), &json!([]), Some(0.2), false, None))
+                .unwrap();
+        assert!(body.get("response_format").is_none());
+        assert!(body.get("max_tokens").is_none());
+        assert_eq!(body["temperature"], json!(0.2));
+    }
+
+    #[test]
+    fn parse_config_defaults_max_tokens() {
+        // 没配就用缺省预算；配了（>0）就用配置值。
+        let plain = json!({ "config": { "baseUrl": "http://x", "model": "m" } });
+        assert_eq!(parse_config(&plain).unwrap().max_tokens, DEFAULT_MAX_TOKENS);
+        let budgeted =
+            json!({ "config": { "baseUrl": "http://x", "model": "m", "maxTokens": 1024 } });
+        assert_eq!(parse_config(&budgeted).unwrap().max_tokens, 1024);
+        // 0 视同没配（回到缺省）
+        let zero = json!({ "config": { "baseUrl": "http://x", "model": "m", "maxTokens": 0 } });
+        assert_eq!(parse_config(&zero).unwrap().max_tokens, DEFAULT_MAX_TOKENS);
     }
 }
