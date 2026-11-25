@@ -2,11 +2,15 @@
 //!
 //! 功能对照 opencut 的导出对话框:头部是画布信息;格式(MP4·H.264/H.265)、
 //! 画质(与源相同码率/低/中/高/极高/自定义码率)、包含音频;「整段导出」
-//! 与「分P导出」两张可同时勾选的卡片——分P按时长或数量拆分,实时预览文
+//! 与「分P导出」两张可同时勾选的卡片(整段缺省不勾选,分P缺省勾选)
+//! ——分P按时长或数量拆分,实时预览文
 //! 件名与起止,末P过短自动并入上一P;封面(选择/编辑/清除,编辑器复用
 //! Reaction 的 reaction);投稿模板(标题/标签/简介 → `<名>.biliup.json`);
 //! 输出文件夹。点「开始导出」弹窗立即关闭:进度与重试在导出模式的导出
 //! 队列里看,封面与投稿模板由 `settle_in_flight` 在全部终态后落盘。
+//! 它左边的「发送到队列」与导出界面的同名按钮同义:同一批输出排进导出
+//! 队列但不启动,由用户在导出队列里自己启动;收尾同样走 `settle_in_flight`
+//! ——队列还没启动时它静静等着,不做每帧轮询的空转。
 //!
 //! 两张卡片同时勾选时不渲染两遍:整段只导出一次(字幕、效果、画质全在
 //! 里面),每个分P再用引擎的 `export.split`(流复制,不重编码)从整段
@@ -16,9 +20,10 @@
 //! 上,`duration` 模式每P固定帧数、末P短于 max(5s, 每P×25%) 时并入上一
 //! P,`count` 模式均分、余数摊给前面的P。
 //!
-//! 导出本身走引擎现成的队列:每个渲染输出一次 `export.queue.add`,一次
-//! `export.queue.start`;`settle_in_flight` 每帧轮询 `export.queue.list`
-//! 与切分作业,全部终态后复制封面、写投稿模板。设置以导出界面的当前设
+//! 导出本身走引擎现成的队列:每个渲染输出一次 `export.queue.add`,「开始
+//! 导出」再补一次 `export.queue.start`;`settle_in_flight` 读会话里的队列
+//! (`poll_persistence` 每帧已 pump 过完成态)与切分作业,全部终态后复制封
+//! 面、写投稿模板。设置以导出界面的当前设
 //! 置为基础——效果、硬件编码、GPU 渲染、元数据等自动跟随导出界面,字幕
 //! 烧录恒开(见 `settings_for`),弹窗只覆盖格式、画质、音频与「匹配源」。
 //!
@@ -28,12 +33,14 @@
 //! `partsExport.splitMode.<k>`, `partsExport.perPart`, `partsExport.partCount`,
 //! `partsExport.cover.pick`, `partsExport.cover.edit`, `partsExport.cover.clear`,
 //! `partsExport.title`, `partsExport.tags`, `partsExport.desc`,
-//! `partsExport.location`, `partsExport.go`, `partsExport.cancel`。
+//! `partsExport.location`, `partsExport.queue`, `partsExport.go`,
+//! `partsExport.cancel`。
 
 use std::path::PathBuf;
 
 use egui::{Align2, Color32, Sense, pos2, vec2};
 use filmcraft_engine::export::{AudioCodec, AudioSettings, BitrateMode, ExportSettings, Format, HardwareEncoding, Multiplexer};
+use filmcraft_engine::export_tools::QueueStatus;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -57,8 +64,11 @@ const MIN_LAST_PART_FRACTION: f64 = 0.25;
 pub const MAX_TAGS: usize = 10;
 /// 标题最长(biliup 的上限,字符数)。
 const MAX_TITLE_CHARS: usize = 80;
-/// 弹窗底栏(汇总 + 取消/开始)占的高度,滚动区从内容区里先把它让出来。
+/// 弹窗底栏(汇总 + 取消/发送到队列/开始)占的高度,滚动区从内容区里先把它让出来。
 const FOOTER_HEIGHT: f32 = 44.0;
+/// 底栏按钮同宽同高:「取消」「发送到队列」「开始导出」。
+const FOOTER_BUTTON_WIDTH: f32 = 110.0;
+const FOOTER_BUTTON_HEIGHT: f32 = 28.0;
 
 /// 一段分P(秒,含头含尾)。
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -143,6 +153,7 @@ pub struct PartsExportUi {
     /// 自定义码率(Mbps,`quality == custom` 时生效)。
     pub custom_mbps: f64,
     pub include_audio: bool,
+    /// 整段导出:缺省不勾选——这个弹窗的常态交付是分P,整段是可选。
     pub whole_enabled: bool,
     pub parts_enabled: bool,
     pub prefix: String,
@@ -234,7 +245,7 @@ impl Default for PartsExportUi {
             quality: "source".into(),
             custom_mbps: 16.0,
             include_audio: true,
-            whole_enabled: true,
+            whole_enabled: false,
             parts_enabled: true,
             prefix: String::new(),
             separator: "_".into(),
@@ -780,7 +791,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
         }
     }
     // 按钮信号:闭包里只借弹窗状态,动 app 的都在闭包外。
-    let (mut pick_cover, mut pick_folder, mut edit_cover, mut go) = (false, false, false, false);
+    let (mut pick_cover, mut pick_folder, mut edit_cover, mut go, mut queue_send) = (false, false, false, false, false);
 
     let Some(q) = app.session.active_sequence().cloned() else { return }; // checked above
     let rate = q.settings.frame_rate;
@@ -837,7 +848,7 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
         .default_pos(crate::widgets::dialog_center(ctx))
         .show(ctx, |ui| {
             let p = &mut app.ui.export.parts;
-            configure_view(ui, &t, &mut reg, p, &ctx_info, &mut pick_cover, &mut pick_folder, &mut edit_cover, &mut go);
+            configure_view(ui, &t, &mut reg, p, &ctx_info, &mut pick_cover, &mut pick_folder, &mut edit_cover, &mut queue_send, &mut go);
         });
     // 记下弹窗矩形给下一帧的边带阻挡层(见上),并把弹窗层重新顶到
     // 最上:边带被点会把自己顶上来(egui 的 Area 行为,API 无开关),
@@ -852,8 +863,10 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     if let Some(path) = app.ui.export.parts.cover_path.clone() {
         load_cover_thumb(ctx, &path, &mut app.ui.export.parts);
     }
-    if go {
-        if let Err(e) = start_export(app) {
+    if go || queue_send {
+        // `start` = 点的是「开始导出」:入队之后立刻启动队列。「发送到队列」
+        // 只入队,与导出界面的同名按钮同义。
+        if let Err(e) = start_export(app, go) {
             app.ui.status = e;
         }
     }
@@ -1053,6 +1066,7 @@ fn configure_view(
     pick_cover: &mut bool,
     pick_folder: &mut bool,
     edit_cover: &mut bool,
+    queue_send: &mut bool,
     go: &mut bool,
 ) {
     // 滚动区的高度=弹窗内容区减去底栏,底栏因此永远钉在窗口底部。
@@ -1284,7 +1298,8 @@ fn configure_view(
                 });
         });
 
-    // 底栏:汇总 + 取消/开始(滚动区之外)。
+    // 底栏:汇总 + 取消/发送到队列/开始导出(滚动区之外)。三颗按钮同宽
+    // 同高同圆角;RTL 布局里先加的在右:开始导出、发送到队列、取消。
     ui.add_space(4.0);
     ui.horizontal(|ui| {
         let videos = p.whole_enabled as usize
@@ -1300,21 +1315,53 @@ fn configure_view(
         } else {
             tlf!("{n} files: {videos} videos + 1 upload template + 1 cover", n = videos + 2, videos = videos)
         };
-        ui.label(egui::RichText::new(summary).color(t.text_dim).size(11.5));
+        // 按钮的宽度先让出来:窗口缩到最小宽度时汇总文字截断,不压到
+        // 按钮上(三颗按钮永远完整可见、可点)。
+        let buttons_w = 3.0 * FOOTER_BUTTON_WIDTH + 2.0 * ui.spacing().item_spacing.x + ui.spacing().item_spacing.x;
+        let summary_w = (ui.available_width() - buttons_w).max(40.0);
+        ui.allocate_ui_with_layout(vec2(summary_w, FOOTER_BUTTON_HEIGHT), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+            ui.add(egui::Label::new(egui::RichText::new(summary).color(t.text_dim).size(11.5)).truncate());
+        });
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let r = ui.add_enabled(
-                c.can_go,
-                egui::Button::new(egui::RichText::new(tl!("Start Export")).color(Color32::WHITE)).fill(t.accent).corner_radius(12.0).min_size(vec2(110.0, 28.0)),
-            );
+            let r = footer_button(ui, t, tl!("Start Export"), c.can_go, ButtonKind::Primary);
             reg.add("partsExport.go", r.rect, "Start Export");
             *go = r.clicked();
-            let r = ui.button(tl!("Cancel"));
+            // 与导出界面的「发送到队列」同义:排进导出队列但不启动,进度
+            // 与重试在导出模式的导出队列里看。
+            let r = footer_button(ui, t, tl!("Send to Queue"), c.can_go, ButtonKind::Primary);
+            reg.add("partsExport.queue", r.rect, "Send to Queue");
+            *queue_send = r.clicked();
+            let r = footer_button(ui, t, tl!("Cancel"), true, ButtonKind::Secondary);
             reg.add("partsExport.cancel", r.rect, "Cancel");
             if r.clicked() {
                 p.open = false;
             }
         });
     });
+}
+
+/// 底栏按钮的主次。「开始导出」「发送到队列」是主按钮(圆角蓝底白字);
+/// 「取消」是次要按钮:同宽同高同圆角,底色/描边/悬停走主题里的普通按钮
+/// 视觉(常态 field_bg + field_border,悬停 hover),不与主操作抢眼。
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ButtonKind {
+    Primary,
+    Secondary,
+}
+
+/// 底栏按钮:同宽同高同圆角。主按钮禁用时退回灰底灰字(一眼看出不可
+/// 点——开始导出此前禁用时仍是蓝底,看不出没生效)。
+fn footer_button(ui: &mut egui::Ui, t: &Tokens, label: &str, enabled: bool, kind: ButtonKind) -> egui::Response {
+    let min_size = vec2(FOOTER_BUTTON_WIDTH, FOOTER_BUTTON_HEIGHT);
+    if kind == ButtonKind::Secondary {
+        // 不指定底色:用主题的普通按钮视觉,悬停/按下都有反馈。
+        return ui.add_enabled(enabled, egui::Button::new(label).corner_radius(12.0).min_size(min_size));
+    }
+    let (fill, text) = if enabled { (t.accent, Color32::WHITE) } else { (t.field_bg, t.text_faint) };
+    ui.add_enabled(
+        enabled,
+        egui::Button::new(egui::RichText::new(label).color(text)).fill(fill).corner_radius(12.0).min_size(min_size),
+    )
 }
 
 fn split_error_text(err: SplitError) -> String {
@@ -1426,8 +1473,11 @@ pub fn plan_outputs(
     (queue, split)
 }
 
-/// 把每个输出排进导出队列并启动。返回 Err 文案(状态栏)。
-fn start_export(app: &mut FilmcraftApp) -> Result<(), String> {
+/// 把每个输出排进导出队列。`start` 为 true 是「开始导出」——入队后立刻
+/// 启动队列;false 是「发送到队列」——只入队,由用户在导出队列里启动
+/// (与导出界面的同名按钮同义)。两种情况都关闭弹窗、交给
+/// `settle_in_flight` 收尾。返回 Err 文案(状态栏)。
+fn start_export(app: &mut FilmcraftApp, start: bool) -> Result<(), String> {
     let (seq, rate, duration) = {
         let seq = app.session.state.active_sequence.ok_or_else(|| tl!("Parts Export: open a sequence first").to_string())?;
         let q = app.session.active_sequence().cloned().ok_or("no sequence")?;
@@ -1485,7 +1535,7 @@ fn start_export(app: &mut FilmcraftApp) -> Result<(), String> {
             .map(|((file, path), part)| PlannedPart { part: *part, item: PartsItem { id: 0, file, path } })
             .collect();
     }
-    if let Err(e) = app.session.execute("export.queue.start", json!({})) {
+    if start && let Err(e) = app.session.execute("export.queue.start", json!({})) {
         return Err(e.to_string());
     }
     // 分P导出且场景配了片头:以片头自己的文件名直拷为第一个分P(不参与
@@ -1513,37 +1563,45 @@ fn start_export(app: &mut FilmcraftApp) -> Result<(), String> {
     } else {
         p.items.first().map(|i| i.file.rsplit_once('.').map(|(stem, _)| stem.to_string()).unwrap_or_else(|| i.file.clone())).unwrap_or(seq_name)
     };
-    // 开始导出即关闭弹窗(进度与重试在导出模式的导出队列里):在飞标记
-    // 交给 `settle_in_flight`,全部终态后落封面与投稿模板。失败时弹窗
-    // 留在配置视图,错误经状态栏显示。
+    // 两种都关闭弹窗(进度与重试在导出模式的导出队列里):在飞标记交给
+    // `settle_in_flight`,全部终态后落封面与投稿模板。失败时弹窗留在配置
+    // 视图,错误经状态栏显示。「发送到队列」只入队,由用户自己去启动——
+    // 状态栏先报一句,与导出界面的同名按钮一致。
     p.in_flight = true;
     p.open = false;
+    if !start {
+        app.ui.status = tl!("Added to the export queue").into();
+    }
     Ok(())
 }
 
-/// 导出在飞(弹窗已在开始导出时关闭)的每帧收尾:查一次队列,全部到
-/// 终态、(合并路)整段产物也切分完、片头复制(如有)也落定后,复制封
-/// 面、写投稿模板,把结果放进状态栏;没落定就 150ms 后再看。进度与重
-/// 试的完整界面在导出模式的导出队列里。
+/// 导出在飞(弹出已关)的每帧收尾:队列全部到终态、(合并路)整段产物也
+/// 切分完、片头复制(如有)也落定后,复制封面、写投稿模板,把结果放进
+/// 状态栏。进度与重试的完整界面在导出模式的导出队列里。
+///
+/// 只有「发送到队列」时队列可能还停着(全是 Ready):那就不催帧,等用户
+/// 去启动——启动后的编码进度帧会把这里再跑一遍。真在动(队列在跑/有任务
+/// 在编码/切分在飞/片头在拷)才 150ms 后重看,空闲时不留空转的重绘。
 fn settle_in_flight(app: &mut FilmcraftApp, ctx: &egui::Context) {
-    let list: Vec<Value> = app
-        .session
-        .execute("export.queue.list", json!({}))
-        .ok()
-        .and_then(|v| v["items"].as_array().cloned())
-        .unwrap_or_default();
-    let status = |id: u64| {
-        list.iter()
-            .find(|v| v["id"].as_u64() == Some(id))
-            .and_then(|v| v["status"].as_str())
+    // 队列状态直接读会话里的队列:每帧 `poll_persistence` 已经 pump 过
+    // (`export.queue.list` 会再 pump 一次,但这条路径每帧都跑,不值得
+    // 一次 JSON 往返)。
+    let statuses: Vec<(u64, QueueStatus)> = app.session.export_queue.items.iter().map(|it| (it.id, it.status)).collect();
+    let status = |id: u64| statuses.iter().find(|(i, _)| *i == id).map(|(_, s)| *s);
+    // 已经不在队列里(用户 Remove 掉)的条目同样算终态:它不会再产出,
+    // 收尾不能让 `in_flight` 永远挂着、每帧白读一次队列。
+    let finished = |s: Option<QueueStatus>| match s {
+        None => true,
+        Some(QueueStatus::Done | QueueStatus::Failed | QueueStatus::Cancelled) => true,
+        Some(_) => false,
     };
     // 合并路:整段渲染完成才切分(切分作业只起一次),切分完才算收尾完。
     if app.ui.export.parts.split_job.is_none()
         && app.ui.export.parts.split_error.is_none()
         && !app.ui.export.parts.planned_parts.is_empty()
-        && app.ui.export.parts.items.iter().all(|it| matches!(status(it.id), Some("done" | "failed" | "cancelled")))
+        && app.ui.export.parts.items.iter().all(|it| finished(status(it.id)))
     {
-        let whole_done = app.ui.export.parts.items.iter().any(|it| status(it.id) == Some("done"));
+        let whole_done = app.ui.export.parts.items.iter().any(|it| status(it.id) == Some(QueueStatus::Done));
         if whole_done {
             spawn_split(app);
         } else {
@@ -1552,30 +1610,32 @@ fn settle_in_flight(app: &mut FilmcraftApp, ctx: &egui::Context) {
         }
     }
     let split_state = app.ui.export.parts.split_error.clone().map(Err).or_else(|| split_job_state(app));
-    let settled = app.ui.export.parts.items.iter().all(|it| matches!(status(it.id), Some("done" | "failed" | "cancelled")))
+    let intro_pending = app.ui.export.parts.intro.as_ref().is_some_and(|intro| intro_copy_state(intro).is_none());
+    let settled = app.ui.export.parts.items.iter().all(|it| finished(status(it.id)))
         && app.ui.export.parts.planned_parts.iter().all(|_| split_state.is_some())
-        && app
-            .ui
-            .export
-            .parts
-            .intro
-            .as_ref()
-            .is_none_or(|intro| intro_copy_state(intro).is_some());
+        && !intro_pending;
     if !settled {
-        ctx.request_repaint_after(std::time::Duration::from_millis(150));
+        let busy = app.session.export_queue.running
+            || statuses.iter().any(|(_, s)| *s == QueueStatus::Encoding)
+            || (app.ui.export.parts.split_job.is_some() && split_state.is_none())
+            || intro_pending;
+        if busy {
+            ctx.request_repaint_after(std::time::Duration::from_millis(150));
+        }
         return;
     }
     // 有一个成功就写封面与模板;全失败则不写。
     let p = &app.ui.export.parts;
     let split_ok = split_state.as_ref().is_some_and(|r| r.is_ok());
     let split_failed = split_state.as_ref().is_some_and(|r| r.is_err());
-    let done = p.items.iter().filter(|it| status(it.id) == Some("done")).count()
+    let done = p.items.iter().filter(|it| status(it.id) == Some(QueueStatus::Done)).count()
         + usize::from(split_ok) * p.planned_parts.len()
         + usize::from(p.intro.as_ref().is_some_and(|intro| matches!(intro_copy_state(intro), Some(Ok(())))));
-    let failed = p.items.iter().any(|it| status(it.id) == Some("failed"))
+    let failed = p.items.iter().any(|it| status(it.id) == Some(QueueStatus::Failed))
         || split_failed
         || p.intro.as_ref().is_some_and(|intro| matches!(intro_copy_state(intro), Some(Err(_))));
-    let cancelled = p.items.iter().any(|it| status(it.id) == Some("cancelled"));
+    // 被移出队列的条目按取消算(它没有产出)。
+    let cancelled = p.items.iter().any(|it| matches!(status(it.id), None | Some(QueueStatus::Cancelled)));
     // 片头不是队列项,导出队列面板里看不到它的错误,失败文案带在这里。
     let intro_error = p
         .intro

@@ -146,9 +146,11 @@ fn the_parts_entry_in_quick_export_opens_the_dialog() {
         assert!(d.has(id), "{id}");
     }
     assert!(d.app().ui.export.parts.open);
-    // 每P时长默认 2 分钟;画质缺省「与源视频相同码率」。
+    // 每P时长默认 2 分钟;画质缺省「与源视频相同码率」;整段导出默认不勾选。
     assert_eq!(d.app().ui.export.parts.per_part_minutes, 2.0);
     assert_eq!(d.app().ui.export.parts.quality, "source");
+    assert!(!d.app().ui.export.parts.whole_enabled, "整段导出默认不勾选");
+    assert!(d.app().ui.export.parts.parts_enabled, "分P导出默认勾选");
     // quick popup closed with the dialog opening
     assert!(!d.app().ui.export.quick_open);
 
@@ -236,6 +238,8 @@ fn starting_an_export_queues_whole_and_parts_and_cancels() {
         p.cover_path = None;
         p.bili_title = "测试投稿".into();
         p.bili_tags = vec!["reaction".into(), "测试".into()];
+        // 这条测的是合并路,整段与分P都要(整段缺省不勾选)。
+        p.whole_enabled = true;
     }
     d.frames(2);
 
@@ -269,6 +273,69 @@ fn starting_an_export_queues_whole_and_parts_and_cancels() {
     assert!(!base.is_empty(), "the base name was set when the export started");
     assert!(!dir.join(format!("{base}.biliup.json")).is_file(), "nothing was written after cancelling everything");
     assert!(!d.app().ui.export.parts.open);
+}
+
+/// 「发送到队列」:与导出界面的同名按钮同义——同一批输出排进导出队列,
+/// 但不启动队列。弹窗照样关闭、状态栏报「已添加到导出队列」;收尾仍在
+/// 等这批导出(全 Ready 的等待不做每帧轮询),用户不启动就取消时什么也
+/// 不写。底栏三颗按钮同一款式,发送到队列就在开始导出左边。
+#[test]
+fn send_to_queue_queues_without_starting_the_queue() {
+    let mut d = Driver::new("parts-queue");
+    d.ok("ui.set", json!({"mode": "edit"}));
+    d.frames(2);
+    d.click("header.quickExport");
+    d.click("quickExport.parts");
+
+    let dir = d.dir.join("parts-queue-out");
+    std::fs::create_dir_all(&dir).unwrap();
+    {
+        // 只勾分P(缺省):每P取序列时长的 ~2/5,拆出 2-3 段。
+        let duration = d.app().session.active_sequence().map(|q| q.duration().seconds()).unwrap_or(60.0).max(10.0);
+        let p = &mut d.app().ui.export.parts;
+        p.location = dir.to_string_lossy().to_string();
+        p.per_part_minutes = (duration / 60.0 * 0.4).max(1.0 / 60.0);
+        p.cover_path = None;
+        p.whole_enabled = false;
+        p.intro = None;
+        p.intro_loaded_for = None;
+    }
+    d.frames(2);
+
+    // 底栏三颗同款按钮:发送到队列在开始导出左边,取消又在它左边。
+    let go = d.rect("partsExport.go");
+    let queue = d.rect("partsExport.queue");
+    let cancel = d.rect("partsExport.cancel");
+    assert!(queue[0] + queue[2] <= go[0] + 0.5, "发送到队列在开始导出左边: {queue:?} vs {go:?}");
+    assert!(cancel[0] + cancel[2] <= queue[0] + 0.5, "取消在发送到队列左边: {cancel:?} vs {queue:?}");
+    assert_eq!((queue[2], queue[3]), (go[2], go[3]), "发送到队列与开始导出同款同尺寸");
+    assert_eq!((cancel[2], cancel[3]), (go[2], go[3]), "取消与开始导出同款同尺寸");
+
+    let before = d.exec("export.queue.list", json!({}))["items"].as_array().unwrap().len();
+    d.click("partsExport.queue");
+    // 弹窗关闭、状态栏入队提示;队列只多了条目,没有被启动。
+    assert!(!d.app().ui.export.parts.open, "发送到队列后弹窗关闭");
+    assert!(d.app().ui.export.parts.in_flight, "收尾仍在等这批导出");
+    assert_eq!(d.app().ui.status, "Added to the export queue", "状态栏报入队");
+    let list = d.exec("export.queue.list", json!({}));
+    assert_eq!(list["running"], json!(false), "发送到队列不启动队列");
+    let items = list["items"].as_array().unwrap().clone();
+    let queued: Vec<String> = d.app().ui.export.parts.items.iter().map(|i| i.file.clone()).collect();
+    assert!(!queued.is_empty(), "至少一个分P排进了队列");
+    assert_eq!(items.len(), before + queued.len());
+    assert!(items.iter().skip(before).all(|it| it["status"] == json!("ready")), "只入队,都还在等着启动: {items:?}");
+
+    // 没启动就取消(用户在导出队列里清掉):不写产物,in_flight 收尾。
+    d.exec("export.queue.cancel", json!({}));
+    let t0 = std::time::Instant::now();
+    while d.app().ui.export.parts.in_flight {
+        assert!(t0.elapsed().as_secs() < 60, "timed out waiting for the queue-only send to settle");
+        d.frames(2);
+    }
+    let base = d.app().ui.export.parts.base_name.clone();
+    assert!(!base.is_empty(), "the base name was set when the outputs were queued");
+    assert!(!dir.join(format!("{base}.biliup.json")).is_file(), "全取消不写模板");
+    assert!(!dir.join(format!("{base}_封面.png")).is_file(), "全取消不写封面");
 }
 
 /// 投稿模板旁车随项目走:项目目录里的 `<场景名>.publish.json`(reaction
@@ -392,6 +459,8 @@ fn whole_export_is_split_into_parts_without_a_second_render() {
         p.location = out.to_string_lossy().to_string();
         p.per_part_minutes = 0.1;
         p.cover_path = None;
+        // 这条测的是合并路:整段也要(缺省不勾选)。
+        p.whole_enabled = true;
         p.intro = None;
         p.intro_loaded_for = None;
         // 隔离 biliup 配置:合并不到就回落写独立 .biliup.json,不碰用户机器。
