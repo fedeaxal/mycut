@@ -9,10 +9,33 @@ pub struct GpuContext {
     encoder: RefCell<Option<CommandEncoder>>,
 }
 
+/// The backend the beauty chain runs on, pinned per platform.
+///
+/// Not a preference, and `Backends::all()` is what this replaced. wgpu
+/// enumerates Vulkan first on Windows, so "all" lands the chain on Intel's
+/// Vulkan ICD (`igvk64.dll`, driver 30.0.101.1339), which access-violates
+/// while the beauty pipelines are being created and takes the whole process
+/// down. The host pins DX12 on Windows as well (for the Preview's shared
+/// textures, see `reaction::lib::pin_windows_backend`); the beauty chain has
+/// no interop of its own, but DX12 is the one backend every machine that can
+/// run this program's D3D11 compositor already has. macOS and Linux follow
+/// the host's pins for the same reason.
+fn backends() -> wgpu::Backends {
+    #[cfg(target_os = "windows")]
+    let backends = wgpu::Backends::DX12;
+    #[cfg(target_os = "macos")]
+    let backends = wgpu::Backends::METAL;
+    #[cfg(target_os = "linux")]
+    let backends = wgpu::Backends::VULKAN;
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    let backends = wgpu::Backends::all();
+    backends
+}
+
 impl GpuContext {
     pub fn new() -> Self {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
+            backends: backends(),
             flags: wgpu::InstanceFlags::default(),
             backend_options: wgpu::BackendOptions::default(),
             memory_budget_thresholds: wgpu::MemoryBudgetThresholds::default(),
