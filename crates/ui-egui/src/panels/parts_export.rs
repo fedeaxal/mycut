@@ -550,11 +550,24 @@ fn weighted_bitrate(parts: &[(f64, Option<u64>)]) -> Option<u32> {
     Some((known_sum / known_weight / 1000.0).round().clamp(50.0, 800_000.0) as u32)
 }
 
+/// `videos[].id` 的生成器:biliup-app 拿它作全局上传任务键,不同模板共享
+/// 同一任务队列,所以同批里必须互不相同,跨导出/跨模板也不该撞;同时它
+/// 不能等于 filename(那是任务显示名/落盘名)。纳秒时间戳区分进程与导出,
+/// 进程内单调计数器兜底同一时刻的唯一性(时钟回推也不会重复)。
+fn biliup_video_id() -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static SEQ: AtomicU64 = AtomicU64::new(0);
+    let seq = SEQ.fetch_add(1, Ordering::Relaxed);
+    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+    format!("f{nanos:x}-{seq:x}")
+}
+
 /// biliup-app 兼容的投稿模板 JSON(字段与 opencut `export/biliup.ts` 的
 /// 构造一一对应;`videos[].path` 填导出视频的绝对路径,`videos[].title`
 /// 由调用方给——分P是文件名去扩展名,片头固定「片头」)。封面不进模板
-/// (opencut 恒为空串,封面 PNG 只复制到输出目录);`videos[].id` 用文件
-/// 名——biliup-app 拿它作全局上传任务键,不同模板共用任务队列,必须唯一。
+/// (opencut 恒为空串,封面 PNG 只复制到输出目录);`videos[].id` 由
+/// [`biliup_video_id`] 生成(全局唯一,且构造上绝不等于 filename——
+/// 撞形时重取一次兜底)。
 pub fn biliup_json(title: &str, desc: &str, tags: &[String], videos: &[(String, String, String)]) -> Value {
     json!({
         "copyright": 1,
@@ -570,8 +583,13 @@ pub fn biliup_json(title: &str, desc: &str, tags: &[String], videos: &[(String, 
         "videos": videos
             .iter()
             .map(|(filename, path, part_title)| {
+                let mut id = biliup_video_id();
+                // id 绝不能等于 filename(理论撞形也就地兜住)。
+                while id.as_str() == filename.as_str() {
+                    id = biliup_video_id();
+                }
                 json!({
-                    "id": filename,
+                    "id": id,
                     "filename": filename,
                     "title": part_title,
                     "desc": "",
@@ -2084,26 +2102,42 @@ mod tests {
 
     #[test]
     fn biliup_template_shape() {
-        let v = biliup_json(
-            "标题",
-            "简介",
-            &["a".into(), "b".into()],
-            &[("op.mp4".into(), "/out/op.mp4".into(), "片头".into()), ("P1.mp4".into(), "/out/P1.mp4".into(), "P1".into())],
-        );
+        let input = [("op.mp4".to_string(), "/out/op.mp4".to_string(), "片头".to_string()), ("P1.mp4".to_string(), "/out/P1.mp4".to_string(), "P1".to_string())];
+        let v = biliup_json("标题", "简介", &["a".into(), "b".into()], &input);
         assert_eq!(v["tid"], json!(21));
         assert_eq!(v["tid_v2"], json!(0));
         assert_eq!(v["tag"], json!("a,b"));
         assert_eq!(v["cover"], json!(""));
-        assert_eq!(v["videos"][0]["id"], json!("op.mp4"));
         assert_eq!(v["videos"][0]["filename"], json!("op.mp4"), "片头是第一个分P");
         assert_eq!(v["videos"][0]["title"], json!("片头"));
         assert_eq!(v["videos"][0]["path"], json!("/out/op.mp4"));
-        assert_eq!(v["videos"][1]["id"], json!("P1.mp4"));
         assert_eq!(v["videos"][1]["filename"], json!("P1.mp4"));
         assert_eq!(v["videos"][1]["title"], json!("P1"));
         assert_eq!(v["videos"][1]["path"], json!("/out/P1.mp4"));
+        // id 是全局上传任务键:不能等于 filename,同批内也不许重复。
+        let ids: Vec<&str> = v["videos"].as_array().unwrap().iter().map(|v| v["id"].as_str().expect("id is a string")).collect();
+        assert_eq!(ids.len(), 2);
+        assert!(ids.iter().zip(input.iter()).all(|(id, (filename, ..))| *id != filename.as_str()));
+        assert_ne!(ids[0], ids[1]);
         assert_eq!(v["copyright"], json!(1));
         assert_eq!(v["aid"], json!(null));
+    }
+
+    /// 跨导出也必须唯一(biliup-app 的模板共用任务队列):两次构造同批
+    /// 视频,id 不能撞;且 id 恒不等于 filename。
+    #[test]
+    fn biliup_video_ids_stay_unique_across_exports() {
+        let input = [("片头.mp4".to_string(), "/out/片头.mp4".to_string(), "片头".to_string()), ("P1.mp4".to_string(), "/out/P1.mp4".to_string(), "P1".to_string())];
+        let collect = || -> Vec<String> {
+            let v = biliup_json("标题", "简介", &[], &input);
+            v["videos"].as_array().unwrap().iter().map(|v| v["id"].as_str().unwrap().to_string()).collect()
+        };
+        let (a, b) = (collect(), collect());
+        let all: Vec<&String> = a.iter().chain(b.iter()).collect();
+        for (i, id) in all.iter().enumerate() {
+            assert!(!input.iter().any(|(filename, ..)| filename.as_str() == id.as_str()), "id 不等于 filename: {id}");
+            assert!(all[i + 1..].iter().all(|other| other.as_str() != id.as_str()), "id 全局唯一: {id}");
+        }
     }
 
     /// 画质映射:与源相同码率(拿到/拿不到源码率两样)、四档自适应 bpp、
